@@ -9,7 +9,7 @@ import {
   ViewStyle,
 } from 'react-native';
 import { colors } from '../theme/colors';
-import { radius, spacing } from '../theme/spacing';
+import { buttonShadow, radius, spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
 import { ms, s, vs } from '../theme/responsive';
 
@@ -58,12 +58,13 @@ export const AppButton: React.FC<Props> = ({
       onPress={loading || disabled ? undefined : onPress}
       style={({ pressed }) => [
         styles.base,
+        variantShadow(variant, disabled),
         {
           backgroundColor: palette.bg,
           borderColor: palette.border,
           paddingVertical: sz.paddingV,
           paddingHorizontal: sz.paddingH,
-          opacity: pressed && !disabled ? 0.85 : 1,
+          opacity: pressed && !disabled ? 0.88 : 1,
           alignSelf: fullWidth ? 'stretch' : 'flex-start',
         },
         style,
@@ -92,6 +93,17 @@ export const AppButton: React.FC<Props> = ({
   );
 };
 
+function variantShadow(variant: AppButtonVariant, disabled: boolean): ViewStyle {
+  if (disabled) return {};
+  switch (variant) {
+    case 'primary':  return buttonShadow(colors.primary);
+    case 'success':  return buttonShadow(colors.success);
+    case 'danger':   return buttonShadow(colors.danger);
+    case 'premium':  return buttonShadow(colors.premium);
+    default:         return {};
+  }
+}
+
 function paletteFor(variant: AppButtonVariant, disabled: boolean) {
   if (disabled) {
     return { bg: colors.mutedSoft, text: colors.muted, border: colors.border };
@@ -116,9 +128,9 @@ function paletteFor(variant: AppButtonVariant, disabled: boolean) {
 
 const styles = StyleSheet.create({
   base: {
-    borderRadius: radius.lg,
+    borderRadius: radius.pill,
     borderWidth: 1,
-    minHeight: vs(40),
+    minHeight: vs(48),
     justifyContent: 'center',
   },
   row: {

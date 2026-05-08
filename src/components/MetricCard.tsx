@@ -31,7 +31,7 @@ export const MetricCard: React.FC<Props> = ({ label, value, helper, accent = 'ac
       </View>
       <Text style={[typography.numericLg, { color: colors.primary, marginTop: spacing.sm }]}>{value}</Text>
       {helper ? (
-        <Text style={[typography.small, { color: colors.muted, marginTop: vs(2) }]}>{helper}</Text>
+        <Text style={[typography.caption, { color: colors.textCaption, marginTop: vs(2) }]}>{helper}</Text>
       ) : null}
     </View>
   );
@@ -41,9 +41,7 @@ const styles = StyleSheet.create({
   card: {
     flex: 1,
     backgroundColor: colors.card,
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderRadius: radius.xxl,
     padding: spacing.lg,
     minHeight: vs(100),
     ...shadow.card,

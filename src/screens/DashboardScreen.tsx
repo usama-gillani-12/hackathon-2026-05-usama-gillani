@@ -352,17 +352,6 @@ export const DashboardScreen: React.FC<Props> = () => {
             style={StyleSheet.absoluteFill}
           />
 
-          {/* Floating orbs */}
-          <Animated.View style={[styles.orb1, orb1Style]} pointerEvents="none">
-            <LinearGradient colors={[colors.accent + '88', colors.gold + '44']} style={styles.orbInner} />
-          </Animated.View>
-          <Animated.View style={[styles.orb2, orb2Style]} pointerEvents="none">
-            <LinearGradient colors={[colors.success + '66', colors.accent + '33']} style={styles.orbInner} />
-          </Animated.View>
-          <Animated.View style={[styles.orb3, orb3Style]} pointerEvents="none">
-            <LinearGradient colors={[colors.successDark + '44', colors.success + '22']} style={styles.orbInner} />
-          </Animated.View>
-
           {/* ── Top nav row ── */}
           <View style={styles.heroNav}>
             <View style={styles.heroNavLeft}>
@@ -404,17 +393,9 @@ export const DashboardScreen: React.FC<Props> = () => {
             </View>
           </View>
 
-          {/* ── Credit balance glassmorphism card ── */}
+          {/* ── Credit balance card ── */}
           <TouchableOpacity onPress={() => navigation.navigate('BuyCredits')} activeOpacity={0.88} style={styles.creditCardWrap}>
-            <LinearGradient
-              colors={['rgba(192,139,48,0.25)', 'rgba(139,98,24,0.18)', 'rgba(46,125,90,0.1)']}
-              style={styles.creditCard}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-            >
-              {/* Shimmer border */}
-              <View style={styles.creditCardBorder} />
-
+            <View style={styles.creditCard}>
               <View style={styles.creditTop}>
                 <View>
                   <Text style={styles.creditLabel}>AVAILABLE CREDITS</Text>
@@ -432,11 +413,7 @@ export const DashboardScreen: React.FC<Props> = () => {
                   <Text style={styles.addBtnText}>Add</Text>
                 </LinearGradient>
               </View>
-
-              {/* Decorative circles */}
-              <View style={styles.creditCircle1} />
-              <View style={styles.creditCircle2} />
-            </LinearGradient>
+            </View>
           </TouchableOpacity>
         </View>
 
@@ -500,11 +477,14 @@ export const DashboardScreen: React.FC<Props> = () => {
                       <Animated.View style={[StyleSheet.absoluteFill, styles.pulseGlow, glowStyle]} />
                     )}
 
-                    <LinearGradient
-                      colors={item.hot ? [colors.heroDark, colors.heroMid] : [colors.heroMid, colors.heroLight]}
-                      style={styles.pulseCardInner}
-                    >
-                      <Text style={styles.pulseEmoji}>{item.emoji}</Text>
+                    <View style={[styles.pulseCardInner, { backgroundColor: CARD_BG }]}>
+                      {/* Emoji icon */}
+                      <View style={[styles.pulseEmojiWrap, {
+                        backgroundColor: item.hot ? colors.accentSubtle : colors.successSubtle,
+                        borderColor: item.hot ? colors.accent + '40' : colors.success + '40',
+                      }]}>
+                        <Text style={styles.pulseEmoji}>{item.emoji}</Text>
+                      </View>
 
                       <View style={styles.pulseScoreRow}>
                         <Text style={[styles.pulseScore, { color: pulseColor }]}>
@@ -513,13 +493,15 @@ export const DashboardScreen: React.FC<Props> = () => {
                         <Text style={styles.pulseMax}>/100</Text>
                       </View>
 
-                      <Text style={[styles.pulseCat, { color: item.hot ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.5)' }]} numberOfLines={1}>
+                      <Text style={styles.pulseCat} numberOfLines={1}>
                         {item.category}
                       </Text>
 
                       <Sparkline bars={item.bars} color={pulseColor} />
 
-                      <View style={[styles.pulseTrendBadge, { backgroundColor: item.hot ? 'rgba(192,139,48,0.2)' : 'rgba(46,125,90,0.2)' }]}>
+                      <View style={[styles.pulseTrendBadge, {
+                        backgroundColor: item.hot ? colors.accentSubtle : colors.successSubtle,
+                      }]}>
                         <MaterialCommunityIcons name="trending-up" size={ms(10)} color={pulseColor} />
                         <Text style={[styles.pulseTrendText, { color: pulseColor }]}>{item.trend}</Text>
                       </View>
@@ -531,7 +513,7 @@ export const DashboardScreen: React.FC<Props> = () => {
                           </LinearGradient>
                         </View>
                       )}
-                    </LinearGradient>
+                    </View>
                   </Animated.View>
                 </TouchableOpacity>
               );
@@ -547,13 +529,13 @@ export const DashboardScreen: React.FC<Props> = () => {
             <View style={styles.sectionHeader}>
               <View>
                 <Text style={styles.sectionTitle}>What's Trending</Text>
-                <Text style={styles.sectionSub}>Real product launches · Show HN</Text>
+                <Text style={styles.sectionSub}>Latest product launches on Hacker News</Text>
               </View>
               <TouchableOpacity
                 onPress={() => Linking.openURL('https://news.ycombinator.com/show')}
                 style={styles.hnBadge}
               >
-                <Text style={styles.hnBadgeText}>HN</Text>
+                <Text style={styles.hnBadgeText}>Hacker News ↗</Text>
               </TouchableOpacity>
             </View>
 
@@ -572,29 +554,26 @@ export const DashboardScreen: React.FC<Props> = () => {
                     activeOpacity={0.82}
                     style={styles.trendCard}
                   >
-                    <LinearGradient
-                      colors={[colors.heroDark, colors.heroMid]}
-                      style={styles.trendCardInner}
-                    >
+                    <View style={[styles.trendCardInner, { backgroundColor: CARD_BG }]}>
                       {/* Category + badges row */}
                       <View style={styles.trendTopRow}>
                         <View style={styles.trendCatBadge}>
                           <Text style={styles.trendCatText}>{post.category}</Text>
                         </View>
                         {post.isNew && (
-                          <View style={[styles.trendStatusBadge, { backgroundColor: 'rgba(46,125,90,0.25)' }]}>
+                          <View style={[styles.trendStatusBadge, { backgroundColor: colors.successSubtle }]}>
                             <Text style={[styles.trendStatusText, { color: colors.success }]}>NEW</Text>
                           </View>
                         )}
                         {post.isHot && (
-                          <View style={[styles.trendStatusBadge, { backgroundColor: 'rgba(192,139,48,0.2)' }]}>
+                          <View style={[styles.trendStatusBadge, { backgroundColor: colors.accentSubtle }]}>
                             <Text style={[styles.trendStatusText, { color: colors.accent }]}>HOT</Text>
                           </View>
                         )}
                       </View>
 
                       {/* Title */}
-                      <Text style={styles.trendTitle} numberOfLines={3}>
+                      <Text style={[styles.trendTitle, { color: colors.textPrimary }]} numberOfLines={2}>
                         {post.title}
                       </Text>
 
@@ -602,15 +581,15 @@ export const DashboardScreen: React.FC<Props> = () => {
                       <View style={styles.trendStatsRow}>
                         <View style={styles.trendStat}>
                           <MaterialCommunityIcons name="fire" size={ms(12)} color={colors.accent} />
-                          <Text style={styles.trendStatText}>{post.points}</Text>
+                          <Text style={[styles.trendStatText, { color: colors.textCaption }]}>{post.points}</Text>
                         </View>
                         <View style={styles.trendStat}>
-                          <MaterialCommunityIcons name="comment-outline" size={ms(12)} color={colors.muted} />
-                          <Text style={styles.trendStatText}>{post.comments}</Text>
+                          <MaterialCommunityIcons name="comment-outline" size={ms(12)} color={colors.textCaption} />
+                          <Text style={[styles.trendStatText, { color: colors.textCaption }]}>{post.comments}</Text>
                         </View>
-                        <Text style={styles.trendTime}>{post.createdAt}</Text>
+                        <Text style={[styles.trendTime, { color: colors.textCaption }]}>{post.createdAt}</Text>
                       </View>
-                    </LinearGradient>
+                    </View>
                   </TouchableOpacity>
                 </Animated.View>
               ))}
@@ -637,10 +616,7 @@ export const DashboardScreen: React.FC<Props> = () => {
               onPress={() => navigation.navigate('ProductDetail', { productId: topOpportunity.product.id })}
               activeOpacity={0.88}
             >
-              <LinearGradient
-                colors={[colors.heroDark, colors.heroMid, colors.heroLight]}
-                style={styles.topCard}
-              >
+              <View style={styles.topCard}>
                 {/* Accent stripe */}
                 <LinearGradient
                   colors={gradients.premium}
@@ -680,7 +656,7 @@ export const DashboardScreen: React.FC<Props> = () => {
                 {/* Stat row */}
                 <View style={styles.topStatRow}>
                   {[
-                    { label: 'PRICE', value: formatCurrency(topOpportunity.product.price), color: '#F1F5F9' },
+                    { label: 'PRICE', value: formatCurrency(topOpportunity.product.price), color: colors.textPrimary },
                     { label: 'MARGIN', value: `${topOpportunity.marginPercent}%`, color: colors.success },
                     { label: 'SCORE', value: `${topOpportunity.winningScore}`, color: colors.accent },
                     { label: 'UNLOCK', value: `${topOpportunity.unlockCost} cr`, color: colors.premium },
@@ -699,9 +675,9 @@ export const DashboardScreen: React.FC<Props> = () => {
                 <View style={styles.topCta}>
                   <MaterialCommunityIcons name="arrow-right-circle" size={ms(16)} color={colors.accent} />
                   <Text style={styles.topCtaText}>Tap to view full analysis</Text>
-                  <MaterialCommunityIcons name="chevron-right" size={ms(16)} color="rgba(255,255,255,0.25)" />
+                  <MaterialCommunityIcons name="chevron-right" size={ms(16)} color={colors.textCaption} />
                 </View>
-              </LinearGradient>
+              </View>
             </TouchableOpacity>
           </Animated.View>
         )}
@@ -874,24 +850,17 @@ const styles = StyleSheet.create({
   // Credit card
   creditCardWrap: { marginHorizontal: spacing.lg },
   creditCard: {
-    borderRadius: radius.xl,
+    borderRadius: radius.xxl,
     padding: ms(18),
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(192,139,48,0.25)',
-  },
-  creditCardBorder: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: CARD_BG,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: ms(2) },
+    shadowOpacity: 0.06,
+    shadowRadius: ms(12),
+    elevation: 2,
   },
   creditTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  creditLabel: { color: 'rgba(255,255,255,0.4)', fontSize: ms(10), fontWeight: '700', letterSpacing: 1.2, marginBottom: vs(6) },
+  creditLabel: { color: colors.textCaption, fontSize: ms(10), fontWeight: '700', letterSpacing: 1.2, marginBottom: vs(6) },
   creditAmountRow: { flexDirection: 'row', alignItems: 'center', gap: s(8) },
   creditDiamondWrap: {
     width: ms(30),
@@ -900,43 +869,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  creditAmount: { color: '#fff', fontSize: ms(30), fontWeight: '900', letterSpacing: -1 },
-  creditUnit: { color: 'rgba(255,255,255,0.4)', fontSize: ms(14), fontWeight: '600', alignSelf: 'flex-end', marginBottom: vs(4) },
-  creditSub: { color: 'rgba(255,255,255,0.3)', fontSize: ms(11), marginTop: vs(4) },
+  creditAmount: { color: colors.textPrimary, fontSize: ms(30), fontWeight: '900', letterSpacing: -1 },
+  creditUnit: { color: colors.textCaption, fontSize: ms(14), fontWeight: '600', alignSelf: 'flex-end', marginBottom: vs(4) },
+  creditSub: { color: colors.textCaption, fontSize: ms(11), marginTop: vs(4) },
   addBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: s(4),
-    borderRadius: radius.lg,
+    borderRadius: radius.pill,
     paddingHorizontal: s(16),
     paddingVertical: vs(10),
-    shadowColor: colors.accent,
-    shadowOffset: { width: 0, height: ms(3) },
-    shadowOpacity: 0.4,
-    shadowRadius: ms(8),
-    elevation: 4,
   },
-  addBtnText: { color: '#fff', fontSize: ms(14), fontWeight: '800' },
-  creditCircle1: {
-    position: 'absolute',
-    width: ms(140),
-    height: ms(140),
-    borderRadius: ms(70),
-    borderWidth: 1,
-    borderColor: 'rgba(192,139,48,0.12)',
-    bottom: -ms(50),
-    right: -ms(30),
-  },
-  creditCircle2: {
-    position: 'absolute',
-    width: ms(80),
-    height: ms(80),
-    borderRadius: ms(40),
-    borderWidth: 1,
-    borderColor: 'rgba(192,139,48,0.1)',
-    bottom: -ms(10),
-    right: ms(60),
-  },
+  addBtnText: { color: '#fff', fontSize: ms(14), fontWeight: '700' },
 
   // ── Metrics
   metricsRow: {
@@ -947,13 +891,16 @@ const styles = StyleSheet.create({
   },
   metricCard: { flex: 1 },
   metricInner: {
-    borderRadius: radius.lg,
+    borderRadius: radius.xxl,
     padding: ms(12),
     alignItems: 'center',
     gap: vs(4),
-    borderWidth: 1,
-    borderColor: CARD_BORDER,
     backgroundColor: CARD_BG,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: ms(2) },
+    shadowOpacity: 0.06,
+    shadowRadius: ms(12),
+    elevation: 2,
   },
   metricIcon: {
     width: ms(34),
@@ -971,11 +918,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
-    marginTop: spacing.xl,
+    marginTop: spacing.xxxl,
     marginBottom: vs(12),
   },
-  sectionTitle: { fontSize: ms(18), fontWeight: '900', color: colors.textPrimary, letterSpacing: -0.4 },
-  sectionSub: { fontSize: ms(12), color: colors.muted, marginTop: vs(2) },
+  sectionTitle: { fontSize: ms(20), fontWeight: '800', color: colors.textPrimary, letterSpacing: -0.4 },
+  sectionSub: { fontSize: ms(12), color: colors.textCaption, marginTop: vs(2) },
 
   // Live badge
   liveBadge: {
@@ -995,13 +942,10 @@ const styles = StyleSheet.create({
   // ── Market Pulse
   pulseScrollContent: { paddingHorizontal: spacing.lg, gap: s(10), paddingBottom: vs(4) },
   pulseCard: {
-    borderRadius: radius.xl,
+    borderRadius: radius.xxl,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: CARD_BORDER,
   },
   pulseCardActive: {
-    borderColor: colors.accent,
     shadowColor: colors.accent,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.35,
@@ -1009,7 +953,7 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   pulseGlow: {
-    borderRadius: radius.xl,
+    borderRadius: radius.xxl,
     backgroundColor: colors.accentSubtle,
   },
   pulseCardInner: {
@@ -1018,11 +962,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: vs(5),
   },
-  pulseEmoji: { fontSize: ms(26) },
+  pulseEmojiWrap: {
+    width: ms(46),
+    height: ms(46),
+    borderRadius: ms(23),
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
+  pulseEmoji: { fontSize: ms(24) },
   pulseScoreRow: { flexDirection: 'row', alignItems: 'baseline', gap: s(1) },
   pulseScore: { fontSize: ms(24), fontWeight: '900', letterSpacing: -0.5 },
-  pulseMax: { fontSize: ms(11), color: 'rgba(255,255,255,0.3)', fontWeight: '600' },
-  pulseCat: { fontSize: ms(10), fontWeight: '600', textAlign: 'center' },
+  pulseMax: { fontSize: ms(11), color: colors.textCaption, fontWeight: '600' },
+  pulseCat: { fontSize: ms(10), fontWeight: '700', textAlign: 'center', color: colors.textCaption },
   pulseTrendBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1038,10 +990,14 @@ const styles = StyleSheet.create({
 
   // ── Top Opportunity
   topCard: {
-    borderRadius: radius.xl,
+    borderRadius: radius.xxl,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(192,139,48,0.25)',
+    backgroundColor: CARD_BG,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: ms(2) },
+    shadowOpacity: 0.06,
+    shadowRadius: ms(12),
+    elevation: 2,
   },
   topAccentStripe: { height: ms(3) },
   topCardHeader: {
@@ -1068,7 +1024,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(192,139,48,0.3)',
   },
   topCategoryText: { fontSize: ms(9), fontWeight: '800', color: colors.accent, letterSpacing: 1 },
-  topTitle: { fontSize: ms(14), fontWeight: '700', color: '#F1F5F9', lineHeight: ms(20), marginBottom: vs(6) },
+  topTitle: { fontSize: ms(14), fontWeight: '700', color: colors.textPrimary, lineHeight: ms(20), marginBottom: vs(6) },
   scoreRing: {
     width: ms(52),
     height: ms(52),
@@ -1079,28 +1035,26 @@ const styles = StyleSheet.create({
   scoreRingGrad: { flex: 1, borderRadius: ms(24), padding: ms(2) },
   scoreRingInner: {
     flex: 1,
-    backgroundColor: colors.heroDark,
+    backgroundColor: CARD_BG,
     borderRadius: ms(22),
     alignItems: 'center',
     justifyContent: 'center',
   },
-  scoreRingNum: { color: '#fff', fontSize: ms(16), fontWeight: '900', lineHeight: ms(18) },
-  scoreRingDen: { color: 'rgba(255,255,255,0.4)', fontSize: ms(9) },
+  scoreRingNum: { color: colors.textPrimary, fontSize: ms(16), fontWeight: '900', lineHeight: ms(18) },
+  scoreRingDen: { color: colors.textCaption, fontSize: ms(9) },
 
   topStatRow: {
     flexDirection: 'row',
     marginHorizontal: ms(16),
     marginBottom: ms(12),
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    backgroundColor: colors.surfaceVariant,
     borderRadius: radius.lg,
     padding: ms(12),
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
   },
   topStat: { flex: 1, alignItems: 'center' },
-  topStatLabel: { fontSize: ms(9), color: 'rgba(255,255,255,0.35)', fontWeight: '700', letterSpacing: 0.6 },
-  topStatValue: { fontSize: ms(14), fontWeight: '900', color: '#F1F5F9', marginTop: vs(3) },
-  topStatDivider: { width: 1, backgroundColor: 'rgba(255,255,255,0.07)', marginVertical: vs(2) },
+  topStatLabel: { fontSize: ms(9), color: colors.textCaption, fontWeight: '700', letterSpacing: 0.6 },
+  topStatValue: { fontSize: ms(14), fontWeight: '900', color: colors.textPrimary, marginTop: vs(3) },
+  topStatDivider: { width: 1, backgroundColor: colors.divider, marginVertical: vs(2) },
 
   scorePill: {
     backgroundColor: colors.premiumSubtle,
@@ -1119,7 +1073,7 @@ const styles = StyleSheet.create({
     gap: s(6),
     paddingBottom: ms(14),
   },
-  topCtaText: { color: 'rgba(255,255,255,0.4)', fontSize: ms(12), fontWeight: '600', flex: 1, textAlign: 'center' },
+  topCtaText: { color: colors.textCaption, fontSize: ms(12), fontWeight: '600', flex: 1, textAlign: 'center' },
 
   // ── Quick Actions
   actionsRow: {
@@ -1134,6 +1088,7 @@ const styles = StyleSheet.create({
     borderRadius: ms(20),
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: colors.accent,
     shadowOffset: { width: 0, height: ms(4) },
     shadowOpacity: 0.35,
     shadowRadius: ms(8),
@@ -1143,12 +1098,15 @@ const styles = StyleSheet.create({
 
   // ── AI Score card
   aiCard: {
-    borderRadius: radius.xl,
+    borderRadius: radius.xxl,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: CARD_BORDER,
     marginTop: spacing.sm,
     backgroundColor: CARD_BG,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: ms(2) },
+    shadowOpacity: 0.06,
+    shadowRadius: ms(12),
+    elevation: 2,
   },
   aiCardInner: { padding: ms(18) },
   aiHeader: {
@@ -1181,52 +1139,46 @@ const styles = StyleSheet.create({
   dimBarFillAnimated: { height: '100%', borderRadius: radius.pill, overflow: 'hidden' },
   dimWeight: { width: ms(34), fontSize: ms(11), fontWeight: '800', textAlign: 'right' },
 
-  aiCta: { borderRadius: radius.lg, overflow: 'hidden' },
+  aiCta: { borderRadius: radius.xl, overflow: 'hidden' },
   aiCtaInner: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: s(6),
     padding: ms(12),
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
   },
   aiCtaText: { color: colors.accent, fontSize: ms(13), fontWeight: '700' },
 
   // ── What's Trending (HN)
   hnBadge: {
     backgroundColor: 'rgba(255,102,0,0.15)',
-    borderRadius: radius.sm,
-    paddingHorizontal: s(10),
+    borderRadius: radius.pill,
+    paddingHorizontal: s(12),
     paddingVertical: vs(5),
     borderWidth: 1,
     borderColor: 'rgba(255,102,0,0.3)',
   },
-  hnBadgeText: { color: '#FF6600', fontSize: ms(11), fontWeight: '900', letterSpacing: 0.5 },
+  hnBadgeText: { color: '#FF6600', fontSize: ms(11), fontWeight: '700', letterSpacing: 0.3 },
 
   trendScrollContent: { paddingHorizontal: spacing.lg, gap: s(10), paddingBottom: vs(4) },
   trendCard: {
-    borderRadius: radius.xl,
+    borderRadius: radius.xxl,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: CARD_BORDER,
   },
   trendCardInner: {
     width: ms(190),
+    height: ms(155),
     padding: ms(14),
-    gap: vs(8),
   },
   trendTopRow: { flexDirection: 'row', alignItems: 'center', gap: s(6), flexWrap: 'wrap' },
   trendCatBadge: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: colors.surfaceVariant,
     borderRadius: radius.sm,
     paddingHorizontal: s(7),
     paddingVertical: vs(2),
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
   },
-  trendCatText: { color: 'rgba(255,255,255,0.55)', fontSize: ms(9), fontWeight: '700', letterSpacing: 0.4 },
+  trendCatText: { color: colors.textCaption, fontSize: ms(9), fontWeight: '700', letterSpacing: 0.4 },
   trendStatusBadge: {
     borderRadius: radius.pill,
     paddingHorizontal: s(6),
@@ -1239,8 +1191,9 @@ const styles = StyleSheet.create({
     color: '#F1F5F9',
     lineHeight: ms(19),
     flex: 1,
+    marginVertical: vs(6),
   },
-  trendStatsRow: { flexDirection: 'row', alignItems: 'center', gap: s(10), marginTop: vs(2) },
+  trendStatsRow: { flexDirection: 'row', alignItems: 'center', gap: s(10) },
   trendStat: { flexDirection: 'row', alignItems: 'center', gap: s(3) },
   trendStatText: { color: 'rgba(255,255,255,0.5)', fontSize: ms(11), fontWeight: '600' },
   trendTime: { color: 'rgba(255,255,255,0.3)', fontSize: ms(10), marginLeft: 'auto' },

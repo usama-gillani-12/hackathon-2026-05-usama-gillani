@@ -11,15 +11,14 @@ import {
 } from 'react-native';
 import { Text } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'react-native-linear-gradient';
-import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { AuthStackParamList } from '../../types/navigation';
 import { useAuthStore } from '../../stores/useAuthStore';
-import { colors, gradients } from '../../theme/colors';
+import { colors } from '../../theme/colors';
 import { radius, spacing } from '../../theme/spacing';
 import { ms, s, vs } from '../../theme/responsive';
 
@@ -107,10 +106,7 @@ export const SignupScreen: React.FC<Props> = ({ navigation }) => {
     setLoading(true);
     const { error, needsEmailConfirmation } = await signUp(data.email, data.password, data.name);
     setLoading(false);
-    if (error) {
-      setServerError(error);
-      return;
-    }
+    if (error) { setServerError(error); return; }
     if (needsEmailConfirmation) {
       setConfirmEmailMsg(
         `We sent a confirmation link to ${data.email.trim()}. Tap it, then come back and sign in.`,
@@ -119,10 +115,7 @@ export const SignupScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   return (
-    <LinearGradient colors={[colors.heroDark, colors.heroMid, colors.heroDark]} style={styles.container}>
-      <View style={[styles.orb, styles.orbTopRight]} />
-      <View style={[styles.orb, styles.orbBottomLeft]} />
-
+    <View style={styles.container}>
       <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -133,40 +126,21 @@ export const SignupScreen: React.FC<Props> = ({ navigation }) => {
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
-            {/* Brand */}
-            <Animated.View entering={FadeInDown.delay(80).springify()} style={styles.brand}>
-              <LinearGradient
-                colors={gradients.accent}
-                style={styles.logoCircle}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-              >
-                <Text style={styles.logoText}>TP</Text>
-              </LinearGradient>
-              <Text style={styles.appName}>TrendPro</Text>
-              <Text style={styles.tagline}>Your free credits are waiting</Text>
+            {/* Heading */}
+            <Animated.View entering={FadeInDown.delay(60).springify()} style={styles.heading}>
+              <Text style={styles.headingTitle}>Create account</Text>
+              <Text style={styles.headingSubtitle}>Start finding winning products today</Text>
             </Animated.View>
 
-            {/* Card */}
-            <Animated.View entering={FadeInUp.delay(180).springify()} style={styles.card}>
-              <View style={styles.cardHeader}>
-                <Text style={styles.cardTitle}>Create account</Text>
-                <Text style={styles.cardSubtitle}>Start finding winning products today</Text>
-              </View>
+            {/* Free credits badge */}
+            <Animated.View entering={FadeInDown.delay(100).springify()} style={styles.creditsBadge}>
+              <Text style={styles.creditsBadgeText}>
+                🎁  2 free credits on sign up — no card needed
+              </Text>
+            </Animated.View>
 
-              {/* Free credits badge */}
-              <View style={styles.creditsBadge}>
-                <LinearGradient
-                  colors={['rgba(192,139,48,0.15)', 'rgba(192,139,48,0.06)']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.creditsBadgeGradient}
-                >
-                  <Text style={styles.creditsBadgeText}>
-                    🎁  2 free credits on sign up — no card needed
-                  </Text>
-                </LinearGradient>
-              </View>
+            {/* Form */}
+            <Animated.View entering={FadeInDown.delay(160).springify()}>
 
               {/* Full name */}
               <Controller
@@ -182,11 +156,10 @@ export const SignupScreen: React.FC<Props> = ({ navigation }) => {
                         errors.name && styles.inputRowError,
                       ]}
                     >
-                      <Text style={styles.fieldIcon}>A</Text>
                       <TextInput
                         style={styles.input}
                         placeholder="Jane Smith"
-                        placeholderTextColor="rgba(255,255,255,0.22)"
+                        placeholderTextColor={colors.textCaption}
                         value={value}
                         onChangeText={onChange}
                         onBlur={() => { onBlur(); setNameFocused(false); }}
@@ -217,12 +190,11 @@ export const SignupScreen: React.FC<Props> = ({ navigation }) => {
                         errors.email && styles.inputRowError,
                       ]}
                     >
-                      <Text style={styles.fieldIcon}>@</Text>
                       <TextInput
                         ref={emailRef}
                         style={styles.input}
                         placeholder="you@example.com"
-                        placeholderTextColor="rgba(255,255,255,0.22)"
+                        placeholderTextColor={colors.textCaption}
                         value={value}
                         onChangeText={onChange}
                         onBlur={() => { onBlur(); setEmailFocused(false); }}
@@ -254,12 +226,11 @@ export const SignupScreen: React.FC<Props> = ({ navigation }) => {
                         errors.password && styles.inputRowError,
                       ]}
                     >
-                      <Text style={styles.fieldIcon}>*</Text>
                       <TextInput
                         ref={passwordRef}
                         style={styles.input}
                         placeholder="Min. 8 characters"
-                        placeholderTextColor="rgba(255,255,255,0.22)"
+                        placeholderTextColor={colors.textCaption}
                         value={value}
                         onChangeText={onChange}
                         onBlur={() => { onBlur(); setPasswordFocused(false); }}
@@ -291,7 +262,7 @@ export const SignupScreen: React.FC<Props> = ({ navigation }) => {
                                   backgroundColor:
                                     bar <= strengthConfig.bars
                                       ? strengthConfig.color
-                                      : 'rgba(255,255,255,0.1)',
+                                      : colors.divider,
                                 },
                               ]}
                             />
@@ -321,12 +292,11 @@ export const SignupScreen: React.FC<Props> = ({ navigation }) => {
                         passwordsMatch && styles.inputRowSuccess,
                       ]}
                     >
-                      <Text style={styles.fieldIcon}>*</Text>
                       <TextInput
                         ref={confirmRef}
                         style={styles.input}
                         placeholder="Re-enter password"
-                        placeholderTextColor="rgba(255,255,255,0.22)"
+                        placeholderTextColor={colors.textCaption}
                         value={value}
                         onChangeText={onChange}
                         onBlur={() => { onBlur(); setConfirmFocused(false); }}
@@ -356,8 +326,7 @@ export const SignupScreen: React.FC<Props> = ({ navigation }) => {
               {/* Server error banner */}
               {serverError && (
                 <View style={styles.errorBanner}>
-                  <Text style={styles.errorBannerIcon}>⚠</Text>
-                  <Text style={styles.errorBannerText}>{serverError}</Text>
+                  <Text style={styles.errorBannerText}>⚠  {serverError}</Text>
                 </View>
               )}
 
@@ -372,22 +341,18 @@ export const SignupScreen: React.FC<Props> = ({ navigation }) => {
               {/* CTA */}
               <TouchableOpacity
                 onPress={handleSubmit(onSubmit)}
-                activeOpacity={0.82}
-                style={[styles.ctaWrap, (!isValid || loading) && styles.ctaDisabled]}
+                activeOpacity={0.85}
+                style={[
+                  styles.ctaBtn,
+                  (!isValid || loading) && styles.ctaDisabled,
+                ]}
                 disabled={!isValid || loading}
               >
-                <LinearGradient
-                  colors={[colors.accent, colors.accentHover, colors.premiumDark]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.ctaBtn}
-                >
-                  {loading ? (
-                    <ActivityIndicator color={colors.white} size="small" />
-                  ) : (
-                    <Text style={styles.ctaLabel}>Create Account</Text>
-                  )}
-                </LinearGradient>
+                {loading ? (
+                  <ActivityIndicator color={colors.white} size="small" />
+                ) : (
+                  <Text style={styles.ctaLabel}>Create Account</Text>
+                )}
               </TouchableOpacity>
 
               {/* Divider */}
@@ -424,130 +389,58 @@ export const SignupScreen: React.FC<Props> = ({ navigation }) => {
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
-    </LinearGradient>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  container: { flex: 1, backgroundColor: colors.background },
   safe: { flex: 1 },
   keyboardView: { flex: 1 },
 
-  orb: {
-    position: 'absolute',
-    borderRadius: ms(300),
-    opacity: 0.18,
-  },
-  orbTopRight: {
-    width: ms(260),
-    height: ms(260),
-    top: vs(-50),
-    right: s(-70),
-    backgroundColor: colors.premium,
-  },
-  orbBottomLeft: {
-    width: ms(220),
-    height: ms(220),
-    bottom: vs(-50),
-    left: s(-50),
-    backgroundColor: colors.accent,
-  },
-
   scroll: {
     flexGrow: 1,
-    paddingHorizontal: spacing.lg,
-    paddingBottom: vs(24),
+    paddingHorizontal: spacing.page,
+    paddingBottom: vs(32),
   },
 
-  brand: {
-    alignItems: 'center',
-    paddingTop: vs(24),
+  heading: {
+    paddingTop: vs(40),
     paddingBottom: vs(20),
   },
-  logoCircle: {
-    width: ms(56),
-    height: ms(56),
-    borderRadius: ms(16),
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: vs(12),
-    shadowColor: colors.accent,
-    shadowOffset: { width: 0, height: ms(8) },
-    shadowOpacity: 0.6,
-    shadowRadius: ms(16),
-    elevation: 12,
-  },
-  logoText: {
-    color: colors.white,
-    fontSize: ms(20),
-    fontWeight: '900',
-    letterSpacing: 0.5,
-  },
-  appName: {
-    color: colors.white,
-    fontSize: ms(28),
+  headingTitle: {
+    fontSize: ms(34),
     fontWeight: '800',
-    letterSpacing: -0.8,
+    color: colors.textPrimary,
+    letterSpacing: -0.6,
     marginBottom: vs(6),
   },
-  tagline: {
-    color: 'rgba(255,255,255,0.38)',
-    fontSize: ms(12),
-    fontWeight: '500',
-    letterSpacing: 0.2,
-  },
-
-  card: {
-    backgroundColor: 'rgba(255,255,255,0.055)',
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    padding: ms(24),
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: ms(16) },
-    shadowOpacity: 0.35,
-    shadowRadius: ms(32),
-    elevation: 20,
-  },
-
-  cardHeader: { marginBottom: vs(16) },
-  cardTitle: {
-    color: colors.white,
-    fontSize: ms(22),
-    fontWeight: '800',
-    letterSpacing: -0.5,
-    marginBottom: vs(4),
-  },
-  cardSubtitle: {
-    color: 'rgba(255,255,255,0.4)',
-    fontSize: ms(14),
+  headingSubtitle: {
+    fontSize: ms(15),
     fontWeight: '400',
+    color: colors.textCaption,
   },
 
   creditsBadge: {
+    backgroundColor: colors.accentSubtle,
     borderRadius: radius.lg,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(192,139,48,0.25)',
-    marginBottom: vs(20),
-  },
-  creditsBadgeGradient: {
     paddingVertical: vs(10),
     paddingHorizontal: s(14),
+    marginBottom: vs(24),
   },
   creditsBadgeText: {
-    color: colors.warning,
+    color: colors.accentHover,
     fontSize: ms(13),
     fontWeight: '600',
     textAlign: 'center',
   },
 
-  field: { marginBottom: vs(14) },
+  field: { marginBottom: vs(16) },
   label: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: ms(12),
-    fontWeight: '600',
-    letterSpacing: 0.5,
+    color: colors.textCaption,
+    fontSize: ms(11),
+    fontWeight: '700',
+    letterSpacing: ms(0.8),
     textTransform: 'uppercase',
     marginBottom: vs(8),
   },
@@ -555,48 +448,26 @@ const styles = StyleSheet.create({
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    borderRadius: radius.lg,
+    backgroundColor: colors.surfaceVariant,
+    borderRadius: radius.md,
+    paddingHorizontal: s(16),
+    height: vs(52),
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    paddingHorizontal: s(14),
-    height: vs(50),
+    borderColor: 'transparent',
   },
-  inputRowFocused: {
-    borderColor: colors.accent,
-    backgroundColor: 'rgba(192,139,48,0.1)',
-    shadowColor: colors.accent,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.35,
-    shadowRadius: ms(8),
-    elevation: 4,
-  },
-  inputRowError: {
-    borderColor: colors.danger,
-    backgroundColor: 'rgba(220,38,38,0.08)',
-  },
-  inputRowSuccess: {
-    borderColor: colors.success,
-    backgroundColor: 'rgba(46,125,90,0.08)',
-  },
-  fieldIcon: {
-    color: 'rgba(255,255,255,0.3)',
-    fontSize: ms(16),
-    fontWeight: '700',
-    marginRight: s(10),
-    width: ms(16),
-    textAlign: 'center',
-  },
+  inputRowFocused: { borderColor: colors.accent },
+  inputRowError: { borderColor: colors.danger },
+  inputRowSuccess: { borderColor: colors.success },
   input: {
     flex: 1,
-    color: colors.white,
+    color: colors.textPrimary,
     fontSize: ms(15),
     fontWeight: '400',
     paddingVertical: 0,
   },
   eyeBtn: { paddingLeft: s(10) },
   eyeText: {
-    color: 'rgba(255,255,255,0.35)',
+    color: colors.textCaption,
     fontSize: ms(10),
     fontWeight: '700',
     letterSpacing: 0.5,
@@ -621,10 +492,7 @@ const styles = StyleSheet.create({
     marginTop: vs(8),
     gap: s(8),
   },
-  strengthBars: {
-    flexDirection: 'row',
-    gap: s(4),
-  },
+  strengthBars: { flexDirection: 'row', gap: s(4) },
   strengthBar: {
     width: s(28),
     height: vs(4),
@@ -637,78 +505,53 @@ const styles = StyleSheet.create({
   },
 
   errorBanner: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    backgroundColor: 'rgba(220,38,38,0.12)',
+    backgroundColor: colors.dangerSubtle,
     borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: 'rgba(220,38,38,0.4)',
-    paddingVertical: vs(10),
-    paddingHorizontal: s(12),
-    marginTop: vs(4),
-    marginBottom: vs(12),
-    gap: s(8),
-  },
-  errorBannerIcon: {
-    color: '#FCA5A5',
-    fontSize: ms(14),
-    marginTop: vs(1),
+    paddingVertical: vs(12),
+    paddingHorizontal: s(14),
+    marginBottom: vs(14),
   },
   errorBannerText: {
-    flex: 1,
-    color: '#FCA5A5',
+    color: colors.danger,
     fontSize: ms(13),
     fontWeight: '500',
     lineHeight: ms(18),
   },
+
   confirmBanner: {
-    backgroundColor: 'rgba(22,163,74,0.12)',
+    backgroundColor: colors.successSubtle,
     borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: 'rgba(22,163,74,0.4)',
     paddingVertical: vs(12),
     paddingHorizontal: s(14),
-    marginTop: vs(4),
-    marginBottom: vs(12),
+    marginBottom: vs(14),
   },
   confirmBannerTitle: {
-    color: '#86EFAC',
+    color: colors.success,
     fontSize: ms(13),
     fontWeight: '700',
     marginBottom: vs(4),
   },
   confirmBannerText: {
-    color: 'rgba(134,239,172,0.85)',
+    color: colors.success,
     fontSize: ms(12),
     lineHeight: ms(17),
   },
 
-  ctaWrap: {
-    borderRadius: radius.lg,
-    overflow: 'hidden',
-    marginTop: vs(8),
-    marginBottom: vs(20),
-    shadowColor: colors.accent,
-    shadowOffset: { width: 0, height: ms(6) },
-    shadowOpacity: 0.5,
-    shadowRadius: ms(14),
-    elevation: 10,
-  },
-  ctaDisabled: {
-    opacity: 0.45,
-    shadowOpacity: 0,
-    elevation: 0,
-  },
   ctaBtn: {
-    height: vs(52),
+    height: vs(54),
+    borderRadius: radius.pill,
+    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
+    marginTop: vs(4),
+    marginBottom: vs(24),
   },
+  ctaDisabled: { backgroundColor: colors.divider },
   ctaLabel: {
     color: colors.white,
-    fontSize: ms(16),
-    fontWeight: '800',
-    letterSpacing: 0.3,
+    fontSize: ms(15),
+    fontWeight: '700',
+    letterSpacing: 0.4,
   },
 
   divider: {
@@ -717,35 +560,31 @@ const styles = StyleSheet.create({
     marginBottom: vs(16),
     gap: s(10),
   },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-  },
+  dividerLine: { flex: 1, height: 1, backgroundColor: colors.divider },
   dividerLabel: {
-    color: 'rgba(255,255,255,0.28)',
+    color: colors.textCaption,
     fontSize: ms(10),
     fontWeight: '700',
-    letterSpacing: 1,
+    letterSpacing: ms(0.8),
   },
 
   socialRow: {
     flexDirection: 'row',
     gap: s(10),
-    marginBottom: vs(20),
+    marginBottom: vs(24),
   },
   socialBtn: {
     flex: 1,
-    height: vs(46),
-    borderRadius: radius.lg,
+    height: vs(48),
+    borderRadius: radius.pill,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderColor: colors.divider,
+    backgroundColor: colors.card,
     alignItems: 'center',
     justifyContent: 'center',
   },
   socialBtnText: {
-    color: 'rgba(255,255,255,0.7)',
+    color: colors.textPrimary,
     fontSize: ms(13),
     fontWeight: '600',
   },
@@ -755,21 +594,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  switchText: {
-    color: 'rgba(255,255,255,0.4)',
-    fontSize: ms(14),
-  },
-  switchLink: {
-    color: colors.accent,
-    fontSize: ms(14),
-    fontWeight: '700',
-  },
+  switchText: { color: colors.textCaption, fontSize: ms(14) },
+  switchLink: { color: colors.accent, fontSize: ms(14), fontWeight: '700' },
 
   legal: {
-    color: 'rgba(255,255,255,0.2)',
+    color: colors.textCaption,
     fontSize: ms(11),
     textAlign: 'center',
-    marginTop: vs(20),
+    marginTop: vs(24),
     lineHeight: ms(16),
     paddingHorizontal: s(8),
   },

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from 'react-native-paper';
@@ -12,6 +12,8 @@ import { WatchlistScreen } from '../screens/WatchlistScreen';
 import { BuyCreditsScreen } from '../screens/BuyCreditsScreen';
 import { BottomTabParamList } from '../types/navigation';
 import { colors } from '../theme/colors';
+import { shadow } from '../theme/spacing';
+import { ms } from '../theme/responsive';
 import { useCreditStore } from '../stores/useCreditStore';
 
 const Tab = createBottomTabNavigator<BottomTabParamList>();
@@ -44,20 +46,15 @@ export const BottomTabNavigator: React.FC = () => {
         headerShown: false,
         tabBarStyle: {
           backgroundColor: colors.card,
-          borderTopColor: colors.border,
-          borderTopWidth: StyleSheet.hairlineWidth,
+          borderTopWidth: 0,
           height: 64 + insets.bottom,
           paddingBottom: insets.bottom,
-          elevation: 20,
-          shadowColor: colors.black,
-          shadowOffset: { width: 0, height: -4 },
-          shadowOpacity: 0.12,
-          shadowRadius: 20,
+          ...shadow.tabBar,
         },
         tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.muted,
         tabBarLabelStyle: {
-          fontSize: 11,
+          fontSize: ms(10),
           fontWeight: '600',
           marginBottom: 4,
         },
@@ -75,8 +72,8 @@ export const BottomTabNavigator: React.FC = () => {
         tabBarLabel: ({ focused, color }) => (
           <Text
             style={{
-              fontSize: 11,
-              fontWeight: focused ? '700' : '500',
+              fontSize: ms(10),
+              fontWeight: focused ? '700' : '400',
               color,
               marginBottom: 4,
             }}

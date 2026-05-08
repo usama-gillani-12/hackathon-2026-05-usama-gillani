@@ -43,9 +43,10 @@ export async function fetchTrendingPosts(): Promise<TrendingPost[]> {
   const timeout = setTimeout(() => controller.abort(), 8000);
 
   try {
-    // "Show HN" stories with at least 10 points — real product launches
+    // "Show HN" stories from the last 30 days, sorted newest-first
+    const since = Math.floor((Date.now() - 30 * 24 * 3_600_000) / 1000);
     const res = await fetch(
-      `${HN_ALGOLIA_URL}/search?query=show+hn&tags=story&hitsPerPage=8&numericFilters=points%3E10`,
+      `${HN_ALGOLIA_URL}/search_by_date?query=show+hn&tags=story&hitsPerPage=8&numericFilters=points%3E5,created_at_i%3E${since}`,
       { signal: controller.signal },
     );
     if (!res.ok) throw new Error(`HN Algolia ${res.status}`);

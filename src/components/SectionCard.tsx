@@ -22,7 +22,7 @@ export const SectionCard: React.FC<Props> = ({ title, subtitle, right, children,
           <View style={{ flex: 1 }}>
             {title ? <Text style={[typography.h2, { color: colors.primary }]}>{title}</Text> : null}
             {subtitle ? (
-              <Text style={[typography.small, { color: colors.muted, marginTop: vs(2) }]}>{subtitle}</Text>
+              <Text style={[typography.caption, { color: colors.textCaption, marginTop: vs(2) }]}>{subtitle}</Text>
             ) : null}
           </View>
           {right ? <View>{right}</View> : null}
@@ -36,9 +36,7 @@ export const SectionCard: React.FC<Props> = ({ title, subtitle, right, children,
 const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.card,
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderRadius: radius.xxl,
     ...shadow.card,
   },
   padded: {

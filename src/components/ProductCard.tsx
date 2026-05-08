@@ -104,7 +104,7 @@ export const ProductCard: React.FC<Props> = ({
         <View style={styles.middle}>
           {/* Category + trend icon */}
           <View style={styles.categoryRow}>
-            <Text style={[typography.tiny, { color: colors.muted }]} numberOfLines={1}>
+            <Text style={[typography.tiny, { color: colors.textCaption }]} numberOfLines={1}>
               {product.category.toUpperCase()}
             </Text>
             {!showLocked && (
@@ -186,12 +186,11 @@ export const ProductCard: React.FC<Props> = ({
 const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.card,
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderRadius: radius.xxl,
     padding: spacing.md,
     ...shadow.card,
     overflow: 'hidden',
+    marginBottom: spacing.md,
   },
   cardSelected: {
     borderColor: colors.accent,

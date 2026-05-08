@@ -269,7 +269,7 @@ export const ProductDetailScreen: React.FC<Props> = ({ navigation, route }) => {
         {!isLocked ? (
           <>
             {/* AI Summary */}
-            <LinearGradient colors={[colors.heroDark, colors.heroMid]} style={styles.aiCard}>
+            <View style={styles.aiCard}>
               <View style={styles.aiHeader}>
                 <View style={styles.aiIconWrap}>
                   <MaterialCommunityIcons name="brain" size={ms(16)} color={colors.accent} />
@@ -284,7 +284,7 @@ export const ProductDetailScreen: React.FC<Props> = ({ navigation, route }) => {
               ) : (
                 <Text style={styles.aiBody}>{aiInsights?.aiSummary ?? scored.aiSummary}</Text>
               )}
-            </LinearGradient>
+            </View>
 
             {/* Why Trending */}
             <Surface style={styles.card} elevation={1}>
@@ -353,7 +353,7 @@ export const ProductDetailScreen: React.FC<Props> = ({ navigation, route }) => {
             </Surface>
 
             {/* ── AI Ad Copy Generator ─────────────────────────────────── */}
-            <LinearGradient colors={[colors.heroDark, colors.heroMid]} style={styles.aiCard}>
+            <View style={styles.aiCard}>
               {/* Header */}
               <View style={styles.aiHeader}>
                 <View style={styles.aiIconWrap}>
@@ -438,12 +438,12 @@ export const ProductDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                   ))}
                 </View>
               )}
-            </LinearGradient>
+            </View>
             {/* ── end AI Ad Copy ──────────────────────────────────────── */}
           </>
         ) : (
-          <LinearGradient colors={[colors.heroMid, colors.heroDark]} style={styles.aiLockedCard}>
-            <MaterialCommunityIcons name="lock" size={ms(28)} color={colors.premium} />
+          <View style={styles.aiLockedCard}>
+            <MaterialCommunityIcons name="lock" size={ms(28)} color={colors.accent} />
             <Text style={styles.aiLockedTitle}>Premium Insights Locked</Text>
             <Text style={styles.aiLockedBody}>
               Unlock to reveal AI market analysis, trending signals, risk factors, target audience, ad copy, and platform recommendations.
@@ -456,7 +456,7 @@ export const ProductDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                 </View>
               ))}
             </View>
-          </LinearGradient>
+          </View>
         )}
 
         {/* Action buttons */}
@@ -487,7 +487,7 @@ export const ProductDetailScreen: React.FC<Props> = ({ navigation, route }) => {
             <TouchableOpacity
               onPress={() => navigation.navigate('ProductTestPlan', { productId: scored.product.id })}
               disabled={isLocked}
-              style={[styles.halfBtn, isLocked && styles.halfBtnDisabled]}
+              style={[styles.halfBtn, isLocked && styles.halfBtnDisabled,{marginBottom:3}]}
               activeOpacity={0.8}
             >
               <LinearGradient
@@ -581,13 +581,13 @@ const styles = StyleSheet.create({
   content: { padding: spacing.lg, paddingBottom: spacing.xxxl },
   carousel: { marginHorizontal: -spacing.lg, marginBottom: spacing.lg },
   imageWrap: {
-    height: vs(220), borderRadius: radius.xl, overflow: 'hidden',
+    height: vs(220), borderRadius: radius.xxl, overflow: 'hidden',
     backgroundColor: colors.mutedSoft, marginHorizontal: spacing.sm,
   },
   image: { width: '100%', height: '100%', resizeMode: 'cover' },
   headerRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: spacing.lg },
-  category: { fontSize: ms(10), fontWeight: '700', color: colors.muted, letterSpacing: ms(0.8) },
-  title: { fontSize: ms(20), fontWeight: '800', color: colors.primary, marginTop: vs(4), lineHeight: ms(26) },
+  category: { fontSize: ms(10), fontWeight: '700', color: colors.textCaption, letterSpacing: ms(0.8) },
+  title: { fontSize: ms(24), fontWeight: '800', color: colors.primary, marginTop: vs(4), lineHeight: ms(30) },
   badgeRow: { flexDirection: 'row', alignItems: 'center', gap: ms(8), marginTop: spacing.sm },
   premiumChip: {
     flexDirection: 'row', alignItems: 'center', gap: ms(4),
@@ -604,7 +604,7 @@ const styles = StyleSheet.create({
   amazonMeta: { fontSize: ms(11), fontWeight: '600', color: colors.success },
   amazonAsin: { fontSize: ms(11), color: colors.muted },
   card: {
-    borderRadius: radius.lg, backgroundColor: colors.card,
+    borderRadius: radius.xxl, backgroundColor: colors.card,
     padding: spacing.lg, marginBottom: spacing.md,
   },
   cardTitle: { fontSize: ms(16), fontWeight: '700', color: colors.primary, marginBottom: spacing.sm },
@@ -636,38 +636,42 @@ const styles = StyleSheet.create({
 
   // AI card (unlocked)
   aiCard: {
-    borderRadius: radius.xl, padding: spacing.lg, marginBottom: spacing.md,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+    borderRadius: radius.xxl, padding: spacing.lg, marginBottom: spacing.md,
+    backgroundColor: colors.card,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: ms(2) },
+    shadowOpacity: 0.06,
+    shadowRadius: ms(12),
+    elevation: 2,
   },
   aiHeader: { flexDirection: 'row', alignItems: 'center', gap: ms(8), marginBottom: vs(10) },
   aiIconWrap: {
     width: ms(28), height: ms(28), borderRadius: radius.md,
-    backgroundColor: colors.accentSoft, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: colors.accentSubtle, alignItems: 'center', justifyContent: 'center',
   },
-  aiTitle: { color: colors.white, fontSize: ms(15), fontWeight: '800', flex: 1 },
+  aiTitle: { color: colors.textPrimary, fontSize: ms(15), fontWeight: '800', flex: 1 },
   aiBadge: {
-    backgroundColor: colors.accent, borderRadius: radius.pill,
+    backgroundColor: colors.accentSubtle, borderRadius: radius.pill,
     paddingHorizontal: s(8), paddingVertical: vs(2),
   },
-  aiBadgeText: { color: colors.white, fontSize: ms(9), fontWeight: '900', letterSpacing: 0.5 },
-  aiBody: { color: 'rgba(255,255,255,0.75)', fontSize: ms(14), lineHeight: ms(22) },
+  aiBadgeText: { color: colors.accent, fontSize: ms(9), fontWeight: '900', letterSpacing: 0.5 },
+  aiBody: { color: colors.textCaption, fontSize: ms(14), lineHeight: ms(22) },
 
   // AI locked card
   aiLockedCard: {
-    borderRadius: radius.xl, padding: spacing.xl, marginBottom: spacing.md,
+    borderRadius: radius.xxl, padding: spacing.xl, marginBottom: spacing.md,
     alignItems: 'center', gap: ms(10),
-    borderWidth: 1, borderColor: 'rgba(192,139,48,0.3)',
+    backgroundColor: colors.surfaceVariant,
   },
-  aiLockedTitle: { color: colors.white, fontSize: ms(18), fontWeight: '800' },
-  aiLockedBody: { color: 'rgba(255,255,255,0.55)', fontSize: ms(13), textAlign: 'center', lineHeight: ms(20) },
+  aiLockedTitle: { color: colors.textPrimary, fontSize: ms(18), fontWeight: '800' },
+  aiLockedBody: { color: colors.textCaption, fontSize: ms(13), textAlign: 'center', lineHeight: ms(20) },
   aiLockedFeatures: { flexDirection: 'row', flexWrap: 'wrap', gap: s(8), justifyContent: 'center', marginTop: vs(4) },
   aiLockedFeature: {
     flexDirection: 'row', alignItems: 'center', gap: s(4),
-    backgroundColor: 'rgba(192,139,48,0.2)', borderRadius: radius.pill,
+    backgroundColor: colors.accentSubtle, borderRadius: radius.pill,
     paddingHorizontal: s(10), paddingVertical: vs(5),
-    borderWidth: 1, borderColor: 'rgba(192,139,48,0.3)',
   },
-  aiLockedFeatureText: { color: colors.accent, fontSize: ms(12), fontWeight: '600' },
+  aiLockedFeatureText: { color: colors.accentHover, fontSize: ms(12), fontWeight: '600' },
 
   // Insight sections
   insightHeader: { flexDirection: 'row', alignItems: 'center', gap: ms(10), marginBottom: vs(10) },
@@ -680,15 +684,15 @@ const styles = StyleSheet.create({
   actionsRow: { flexDirection: 'row', gap: spacing.sm },
   watchlistBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: ms(8),
-    borderRadius: radius.xl, borderWidth: 1.5, borderColor: colors.border,
+    borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.border,
     backgroundColor: colors.card, paddingVertical: vs(13),
   },
   watchlistBtnText: { fontSize: ms(15), fontWeight: '700', color: colors.primary },
-  halfBtn: { flex: 1, borderRadius: radius.xl, overflow: 'hidden' },
+  halfBtn: { flex: 1, borderRadius: radius.pill, overflow: 'hidden' },
   halfBtnDisabled: { opacity: 0.5 },
   halfBtnInner: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: ms(6),
-    borderRadius: radius.xl, borderWidth: 1.5, borderColor: colors.border,
+    borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.border,
     backgroundColor: colors.card, paddingVertical: vs(13),
   },
   halfBtnGradient: {
@@ -703,7 +707,7 @@ const styles = StyleSheet.create({
   // ─── AI Ad Copy Generator ────────────────────────────────────────────────────
   adCopyGenBtn: {
     marginTop: vs(10),
-    borderRadius: radius.xl,
+    borderRadius: radius.pill,
     overflow: 'hidden',
   },
   adCopyGenBtnGradient: {
@@ -712,7 +716,7 @@ const styles = StyleSheet.create({
     gap: ms(8),
     paddingVertical: vs(14),
     paddingHorizontal: spacing.lg,
-    borderRadius: radius.xl,
+    borderRadius: radius.pill,
   },
   adCopyGenBtnText: {
     color: colors.white,
@@ -742,7 +746,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   adCopyLoadingText: {
-    color: 'rgba(255,255,255,0.70)',
+    color: colors.textCaption,
     fontSize: ms(13),
     fontStyle: 'italic',
   },
@@ -751,7 +755,7 @@ const styles = StyleSheet.create({
     paddingTop: vs(10),
   },
   adCopyInsufficientText: {
-    color: 'rgba(255,255,255,0.65)',
+    color: colors.textCaption,
     fontSize: ms(13),
     lineHeight: ms(20),
   },
@@ -765,7 +769,7 @@ const styles = StyleSheet.create({
     paddingTop: vs(10),
   },
   adCopyErrorText: {
-    color: 'rgba(255,255,255,0.65)',
+    color: colors.textCaption,
     fontSize: ms(13),
     lineHeight: ms(20),
   },
@@ -781,11 +785,16 @@ const styles = StyleSheet.create({
 
   // ─── AdScriptCard ────────────────────────────────────────────────────────────
   adScriptCard: {
-    backgroundColor: colors.heroLight,
+    backgroundColor: colors.card,
     borderRadius: radius.lg,
     borderLeftWidth: ms(3),
     padding: spacing.lg,
     gap: ms(6),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: ms(1) },
+    shadowOpacity: 0.05,
+    shadowRadius: ms(8),
+    elevation: 1,
   },
   adScriptHeader: {
     flexDirection: 'row',
@@ -801,7 +810,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   adScriptPlatform: {
-    color: colors.white,
+    color: colors.textPrimary,
     fontSize: ms(12),
     fontWeight: '800',
     letterSpacing: ms(0.5),
@@ -811,13 +820,13 @@ const styles = StyleSheet.create({
     padding: ms(4),
   },
   adScriptHeadline: {
-    color: colors.white,
+    color: colors.textPrimary,
     fontSize: ms(15),
     fontWeight: '800',
     lineHeight: ms(22),
   },
   adScriptBody: {
-    color: 'rgba(255,255,255,0.72)',
+    color: colors.textCaption,
     fontSize: ms(13),
     lineHeight: ms(21),
   },

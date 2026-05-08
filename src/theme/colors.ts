@@ -1,26 +1,30 @@
 // ─── Palette (raw hex values) ───────────────────────────────────────────────
 
 const palette = {
-  // Warm ivory surfaces
-  ivory:    '#F8F6F1',
-  cream:    '#F1EDE5',
+  // Clean near-white surfaces (Figma: #F9F9F9)
+  ivory:    '#F9F9F9',
+  cream:    '#F1EDE5', // warm cream kept for legacy gradient usage
   white:    '#FFFFFF',
+
+  // Neutral surfaces (Figma-aligned cool grays)
+  neutral50:  '#F9F9F9',
+  neutral100: '#F0F0F0',
 
   // Ink blacks (hero darks & absolute text)
   ink950:   '#0A0A0A',
   ink900:   '#1A1A1A',
   ink800:   '#2D2D2D',
 
-  // Warm text grays
-  stone600: '#111111',
-  stone500: '#5A5047',
-  stone400: '#8A7D6E',
-  stone300: '#B5A99A',
-  stone200: '#C4B8A8',
+  // Text grays — Figma-aligned neutral scale
+  stone600: '#222222', // Figma primary text
+  stone500: '#555555', // secondary text
+  stone400: '#9B9B9B', // Figma muted / caption gray
+  stone300: '#BBBBBB', // disabled states
+  stone200: '#C4B8A8', // kept for legacy
 
-  // Borders / dividers
-  stone100: '#DDD5C8',
-  sand200:  '#E8E2D8',
+  // Borders / dividers — neutral (Figma: no warm sand)
+  stone100: '#E8E8E8',
+  sand200:  '#E8E2D8', // kept for legacy
 
   // Gold (accent / premium — replaces blue & violet)
   gold600:  '#8B6218',
@@ -57,13 +61,14 @@ export const colors = {
   // Surface
   background: palette.ivory,
   card: palette.white,
-  surfaceVariant: palette.cream,
+  surfaceVariant: palette.neutral100,
 
   // Text
   textPrimary: palette.stone600,
   textSecondary: palette.stone500,
   textDisabled: palette.stone300,
   textInverse: palette.white,
+  textCaption: palette.stone400, // brand names, metadata (Figma: #9B9B9B)
 
   // Primary (near black — headings, nav chrome)
   primary: palette.stone600,
@@ -107,8 +112,8 @@ export const colors = {
   borderError: palette.red600,
   borderSuccess: palette.forest600,
   muted: palette.stone400,
-  mutedSoft: palette.cream,
-  divider: palette.sand200,
+  mutedSoft: palette.neutral100,
+  divider: palette.stone100,
 
   // Platform brand tokens (ad copy feature)
   metaBlue: palette.blue500,

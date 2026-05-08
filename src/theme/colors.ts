@@ -46,6 +46,9 @@ const palette = {
   red600: '#C0392B',
   red100: '#FAEAE8',
   red50:  '#FDF5F4',
+
+  // Platform brand (used only for platform-specific UI elements)
+  blue500: '#1877F2', // Meta brand blue
 } as const;
 
 // ─── Semantic tokens ──────────────────────────────────────────────────────────
@@ -106,6 +109,9 @@ export const colors = {
   muted: palette.stone400,
   mutedSoft: palette.cream,
   divider: palette.sand200,
+
+  // Platform brand tokens (ad copy feature)
+  metaBlue: palette.blue500,
 
   // Hero / dark gradient stops (dark headers contrast against light body)
   heroDark: palette.ink950,

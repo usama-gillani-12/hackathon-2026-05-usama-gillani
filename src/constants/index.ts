@@ -21,6 +21,7 @@ export const PAGE_SIZE_DISCOVER = 12;
 
 // ─── Payment / credits ────────────────────────────────────────────────────────
 export const MOCK_PAYMENT_LATENCY_MS = 1400;
+export const AD_COPY_COST = 1; // credits to generate AI ad scripts
 
 // ─── Cache ────────────────────────────────────────────────────────────────────
 export const PRODUCT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 min

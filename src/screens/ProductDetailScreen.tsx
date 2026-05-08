@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Dimensions, FlatList, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Dimensions, FlatList, Image, ScrollView, Share, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Text, Surface } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'react-native-linear-gradient';
@@ -13,8 +13,12 @@ import { RecommendationBadge } from '../components/RecommendationBadge';
 import { ScoreBadge } from '../components/ScoreBadge';
 import { ScoreBar } from '../components/ScoreBar';
 import { findScoredProduct, loadScoredProducts } from '../services/productService';
-import { generateProductInsights, GeminiInsights } from '../services/geminiService';
+import { generateProductInsights, generateAdCopy, GeminiInsights } from '../services/geminiService';
 import { SCORE_DIMENSIONS } from '../services/scoringService';
+import { generateTxHash } from '../utils/generateTxHash';
+import { useCreditStore } from '../stores/useCreditStore';
+import { AD_COPY_COST } from '../constants';
+import { AdCopyResult, AdScript } from '../types/adCopy';
 import {
   useUnlockedQuery,
   useUnlockProductMutation,
@@ -42,10 +46,15 @@ export const ProductDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   const [loading, setLoading] = useState(true);
   const [aiInsights, setAiInsights] = useState<GeminiInsights | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
+  const [adCopy, setAdCopy] = useState<AdCopyResult | null>(null);
+  const [isGeneratingAdCopy, setIsGeneratingAdCopy] = useState(false);
+  const [adCopyError, setAdCopyError] = useState<string | null>(null);
 
   const { data: unlockedSet = new Set<string>() } = useUnlockedQuery();
   const { data: watchlistItems = [] } = useWatchlistQuery();
   const { data: credits = 0 } = useCreditBalanceQuery();
+  const spendCredits = useCreditStore((s) => s.spendCredits);
+  const recordTransaction = useCreditStore((s) => s.recordTransaction);
 
   const unlockMutation = useUnlockProductMutation();
   const addToWatchlistMutation = useAddToWatchlistMutation();
@@ -110,6 +119,44 @@ export const ProductDetailScreen: React.FC<Props> = ({ navigation, route }) => {
     } else {
       addToWatchlistMutation.mutate({ productId: scored.product.id, status: 'Watching' });
     }
+  };
+
+  const handleGenerateAdCopy = async () => {
+    if (!scored || credits < AD_COPY_COST) return;
+    setIsGeneratingAdCopy(true);
+    setAdCopyError(null);
+
+    // generateAdCopy always returns a result (Gemini or smart fallback)
+    const result = await generateAdCopy(scored);
+
+    // Deduct the credit — generation always succeeds now
+    const ok = await spendCredits(AD_COPY_COST);
+    if (!ok) {
+      setAdCopyError('insufficient-credits');
+      setIsGeneratingAdCopy(false);
+      return;
+    }
+
+    // Record the spend — matches unlockService.ts pattern (usdcAmount:0, network:'mock')
+    const txHash = generateTxHash();
+    await recordTransaction({
+      id: txHash,
+      type: 'unlock',
+      credits: -AD_COPY_COST,
+      usdcAmount: 0,
+      txHash,
+      status: 'confirmed',
+      createdAt: Date.now(),
+      productId: scored.product.id,
+      productTitle: scored.product.title,
+      network: 'mock',
+    });
+
+    // Refresh credit balance badge in tab bar and this screen
+    qc.invalidateQueries({ queryKey: queryKeys.creditBalance });
+
+    setAdCopy(result);
+    setIsGeneratingAdCopy(false);
   };
 
   if (loading || !scored) {
@@ -304,6 +351,95 @@ export const ProductDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                 </View>
               </View>
             </Surface>
+
+            {/* ── AI Ad Copy Generator ─────────────────────────────────── */}
+            <LinearGradient colors={[colors.heroDark, colors.heroMid]} style={styles.aiCard}>
+              {/* Header */}
+              <View style={styles.aiHeader}>
+                <View style={styles.aiIconWrap}>
+                  <MaterialCommunityIcons name="lightning-bolt" size={ms(16)} color={colors.accent} />
+                </View>
+                <Text style={styles.aiTitle}>AI Ad Copy</Text>
+                <View style={styles.aiBadge}>
+                  <Text style={styles.aiBadgeText}>AI</Text>
+                </View>
+              </View>
+
+              {/* State A — not yet generated */}
+              {!adCopy && !isGeneratingAdCopy && adCopyError !== 'generation-failed' && (
+                credits >= AD_COPY_COST ? (
+                  <TouchableOpacity
+                    onPress={handleGenerateAdCopy}
+                    style={styles.adCopyGenBtn}
+                    activeOpacity={0.85}
+                  >
+                    <LinearGradient
+                      colors={gradients.premium}
+                      style={styles.adCopyGenBtnGradient}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                    >
+                      <MaterialCommunityIcons name="robot-outline" size={ms(18)} color={colors.white} />
+                      <Text style={styles.adCopyGenBtnText}>Generate Ad Scripts</Text>
+                      <View style={styles.adCopyCostPill}>
+                        <MaterialCommunityIcons name="lightning-bolt" size={ms(10)} color={colors.accent} />
+                        <Text style={styles.adCopyCostPillText}>{AD_COPY_COST} credit</Text>
+                      </View>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                ) : (
+                  <View style={styles.adCopyInsufficientWrap}>
+                    <MaterialCommunityIcons name="alert-circle-outline" size={ms(16)} color={colors.warning} />
+                    <Text style={styles.adCopyInsufficientText}>
+                      You need {AD_COPY_COST} credit to generate ad scripts. Top up to unlock this feature.
+                    </Text>
+                    <TouchableOpacity onPress={() => navigation.navigate('BuyCredits' as any)}>
+                      <Text style={styles.adCopyBuyLink}>Buy Credits →</Text>
+                    </TouchableOpacity>
+                  </View>
+                )
+              )}
+
+              {/* State B — loading */}
+              {isGeneratingAdCopy && (
+                <View style={styles.adCopyLoadingWrap}>
+                  <ActivityIndicator color={colors.accent} size="small" />
+                  <Text style={styles.adCopyLoadingText}>Crafting your ad scripts…</Text>
+                </View>
+              )}
+
+              {/* State C — generation failed (retry does NOT re-charge) */}
+              {adCopyError === 'generation-failed' && !isGeneratingAdCopy && (
+                <View style={styles.adCopyErrorWrap}>
+                  <MaterialCommunityIcons name="wifi-alert" size={ms(18)} color={colors.danger} />
+                  <Text style={styles.adCopyErrorText}>
+                    Could not reach the AI service. No credits were charged — tap to try again.
+                  </Text>
+                  <TouchableOpacity
+                    onPress={async () => {
+                      setIsGeneratingAdCopy(true);
+                      setAdCopyError(null);
+                      const result = await generateAdCopy(scored);
+                      if (result) { setAdCopy(result); }
+                      else { setAdCopyError('generation-failed'); }
+                      setIsGeneratingAdCopy(false);
+                    }}
+                  >
+                    <Text style={styles.adCopyRetryLink}>Retry →</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {/* State D — scripts ready */}
+              {adCopy && !isGeneratingAdCopy && (
+                <View style={styles.adScriptsWrap}>
+                  {adCopy.scripts.map((script) => (
+                    <AdScriptCard key={script.platform} script={script} />
+                  ))}
+                </View>
+              )}
+            </LinearGradient>
+            {/* ── end AI Ad Copy ──────────────────────────────────────── */}
           </>
         ) : (
           <LinearGradient colors={[colors.heroMid, colors.heroDark]} style={styles.aiLockedCard}>
@@ -378,6 +514,45 @@ export const ProductDetailScreen: React.FC<Props> = ({ navigation, route }) => {
         </View>
       </ScrollView>
     </SafeAreaView>
+  );
+};
+
+// ─── Ad Copy sub-components ───────────────────────────────────────────────────
+
+const PLATFORM_CONFIG: Record<string, { icon: string; color: string; label: string }> = {
+  TikTok: { icon: 'music-note',  color: colors.danger,    label: 'TikTok' },
+  Meta:   { icon: 'facebook',    color: colors.metaBlue,  label: 'Meta'   },
+  Google: { icon: 'google',      color: colors.success,   label: 'Google' },
+};
+
+const AdScriptCard = ({ script }: { script: AdScript }) => {
+  const cfg = PLATFORM_CONFIG[script.platform] ?? PLATFORM_CONFIG.TikTok;
+
+  const handleShare = () => {
+    Share.share({
+      message: `${script.headline}\n\n${script.body}\n\nCTA: ${script.cta}`,
+      title: `${script.platform} Ad Script`,
+    });
+  };
+
+  return (
+    <View style={[styles.adScriptCard, { borderLeftColor: cfg.color }]}>
+      <View style={styles.adScriptHeader}>
+        <View style={[styles.adScriptIconWrap, { backgroundColor: cfg.color + '22' }]}>
+          <MaterialCommunityIcons name={cfg.icon} size={ms(14)} color={cfg.color} />
+        </View>
+        <Text style={styles.adScriptPlatform}>{cfg.label}</Text>
+        <TouchableOpacity onPress={handleShare} style={styles.adScriptShareBtn} activeOpacity={0.7}>
+          <MaterialCommunityIcons name="share-outline" size={ms(16)} color={colors.accent} />
+        </TouchableOpacity>
+      </View>
+      <Text style={styles.adScriptHeadline}>{script.headline}</Text>
+      <Text style={styles.adScriptBody}>{script.body}</Text>
+      <View style={styles.adScriptCtaRow}>
+        <MaterialCommunityIcons name="arrow-right-circle-outline" size={ms(14)} color={colors.accent} />
+        <Text style={styles.adScriptCta}>{script.cta}</Text>
+      </View>
+    </View>
   );
 };
 
@@ -524,4 +699,138 @@ const styles = StyleSheet.create({
   actionBtn: { borderRadius: radius.lg, flex: 1 },
   actionBtnContent: { paddingVertical: vs(4) },
   unlockingText: { fontSize: ms(12), color: colors.muted, textAlign: 'center' },
+
+  // ─── AI Ad Copy Generator ────────────────────────────────────────────────────
+  adCopyGenBtn: {
+    marginTop: vs(10),
+    borderRadius: radius.xl,
+    overflow: 'hidden',
+  },
+  adCopyGenBtnGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: ms(8),
+    paddingVertical: vs(14),
+    paddingHorizontal: spacing.lg,
+    borderRadius: radius.xl,
+  },
+  adCopyGenBtnText: {
+    color: colors.white,
+    fontSize: ms(15),
+    fontWeight: '700',
+    flex: 1,
+  },
+  adCopyCostPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: ms(3),
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderRadius: radius.pill,
+    paddingHorizontal: s(10),
+    paddingVertical: vs(4),
+  },
+  adCopyCostPillText: {
+    color: colors.white,
+    fontSize: ms(11),
+    fontWeight: '700',
+  },
+  adCopyLoadingWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: ms(10),
+    paddingVertical: vs(16),
+    justifyContent: 'center',
+  },
+  adCopyLoadingText: {
+    color: 'rgba(255,255,255,0.70)',
+    fontSize: ms(13),
+    fontStyle: 'italic',
+  },
+  adCopyInsufficientWrap: {
+    gap: ms(6),
+    paddingTop: vs(10),
+  },
+  adCopyInsufficientText: {
+    color: 'rgba(255,255,255,0.65)',
+    fontSize: ms(13),
+    lineHeight: ms(20),
+  },
+  adCopyBuyLink: {
+    color: colors.accent,
+    fontSize: ms(13),
+    fontWeight: '700',
+  },
+  adCopyErrorWrap: {
+    gap: ms(6),
+    paddingTop: vs(10),
+  },
+  adCopyErrorText: {
+    color: 'rgba(255,255,255,0.65)',
+    fontSize: ms(13),
+    lineHeight: ms(20),
+  },
+  adCopyRetryLink: {
+    color: colors.danger,
+    fontSize: ms(13),
+    fontWeight: '700',
+  },
+  adScriptsWrap: {
+    gap: ms(10),
+    marginTop: vs(12),
+  },
+
+  // ─── AdScriptCard ────────────────────────────────────────────────────────────
+  adScriptCard: {
+    backgroundColor: colors.heroLight,
+    borderRadius: radius.lg,
+    borderLeftWidth: ms(3),
+    padding: spacing.lg,
+    gap: ms(6),
+  },
+  adScriptHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: ms(8),
+    marginBottom: vs(6),
+  },
+  adScriptIconWrap: {
+    width: ms(26),
+    height: ms(26),
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  adScriptPlatform: {
+    color: colors.white,
+    fontSize: ms(12),
+    fontWeight: '800',
+    letterSpacing: ms(0.5),
+    flex: 1,
+  },
+  adScriptShareBtn: {
+    padding: ms(4),
+  },
+  adScriptHeadline: {
+    color: colors.white,
+    fontSize: ms(15),
+    fontWeight: '800',
+    lineHeight: ms(22),
+  },
+  adScriptBody: {
+    color: 'rgba(255,255,255,0.72)',
+    fontSize: ms(13),
+    lineHeight: ms(21),
+  },
+  adScriptCtaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: ms(5),
+    marginTop: vs(4),
+  },
+  adScriptCta: {
+    color: colors.accent,
+    fontSize: ms(13),
+    fontWeight: '700',
+    fontStyle: 'italic',
+  },
 });

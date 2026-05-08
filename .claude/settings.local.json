@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(awk -F: '{print $3}')",
+      "Bash(yarn install *)",
+      "Bash(yarn add *)",
+      "Bash(node -e ' *)",
+      "Bash(node -e \"require\\('sharp'\\)\")",
+      "Bash(node -e \"require\\('jimp'\\)\")",
+      "Bash(pip3 install *)",
+      "Bash(yarn ts:check)",
+      "Bash(yarn remove *)",
+      "Bash(xcode-select -p)",
+      "Bash(xcodebuild -version)",
+      "Bash(pod --version)",
+      "Bash(ruby --version)",
+      "Bash(npx expo *)",
+      "Bash(pod install *)",
+      "Bash(npx tsc *)",
+      "Bash(sed -i '' \"s/edges={\\\\['bottom'\\\\]}/edges={['top']}/g\" /Users/mac/TrendPro/src/screens/TrendingProductsScreen.tsx)",
+      "Bash(sed -i '' \"s/edges={\\\\['bottom'\\\\]}/edges={['top']}/g\" /Users/mac/TrendPro/src/screens/WatchlistScreen.tsx)",
+      "Bash(sed -i '' \"s/edges={\\\\['bottom'\\\\]}/edges={['top']}/g\" /Users/mac/TrendPro/src/screens/BuyCreditsScreen.tsx)",
+      "Bash(sed -i '' \"s/edges={\\\\['top'\\\\]}/edges={['top', 'bottom']}/g\" /Users/mac/TrendPro/src/screens/ProfileScreen.tsx)",
+      "Bash(sed -i '' \"s/edges={\\\\['top'\\\\]}/edges={['top', 'bottom']}/g\" /Users/mac/TrendPro/src/screens/AnalyticsScreen.tsx)",
+      "Bash(sed -i '' \"s/edges={\\\\['top'\\\\]}/edges={['top', 'bottom']}/g\" /Users/mac/TrendPro/src/screens/NotificationsScreen.tsx)",
+      "Bash(sed -i '' \"s/edges={\\\\['bottom'\\\\]}/edges={['top', 'bottom']}/g\" /Users/mac/TrendPro/src/screens/SettingsScreen.tsx)",
+      "Bash(sed -i '' \"s/edges={\\\\['bottom'\\\\]}/edges={['top', 'bottom']}/g\" /Users/mac/TrendPro/src/screens/TransactionHistoryScreen.tsx)",
+      "Bash(claude --version)"
+    ]
+  }
+}

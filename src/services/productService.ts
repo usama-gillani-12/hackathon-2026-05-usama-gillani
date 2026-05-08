@@ -2,16 +2,19 @@ import { fetchDummyJsonProducts, pingDummyJson } from '../api/dummyJsonApi';
 import { fetchFakeStoreProducts, pingFakeStore } from '../api/fakeStoreApi';
 import { fetchSocialBuzzScore, isYoutubeKeyConfigured } from '../api/youtubeApi';
 import { fetchAmazonBestSellers, fetchAmazonDeals, isAmazonKeyConfigured, pingAmazon } from '../api/amazonApi';
+import { fetchBestBuyProducts, isBestBuyKeyConfigured, pingBestBuy } from '../api/bestBuyApi';
+import { fetchRedditBuzzByCategory } from '../api/redditMarketApi';
 import { mockProducts } from '../mocks/mockProducts';
 import { Product, ScoredProduct } from '../types/product';
 import { buildScore } from './scoringService';
 
 export interface ProductSourceStatus {
   amazon: 'ok' | 'failed' | 'missing';
+  bestBuy: 'ok' | 'failed' | 'missing';
   dummyJson: 'ok' | 'failed' | 'unknown';
   fakeStore: 'ok' | 'failed' | 'unknown';
   youtube: 'configured' | 'missing';
-  activeSource: 'amazon' | 'dummyjson' | 'fakestore' | 'mock';
+  activeSource: 'amazon' | 'bestbuy' | 'dummyjson' | 'fakestore' | 'mock';
 }
 
 export interface LoadProductsResult {
@@ -24,6 +27,7 @@ let cachedResult: LoadProductsResult | null = null;
 async function gatherProducts(forceMock: boolean): Promise<{ raw: Product[]; status: ProductSourceStatus }> {
   const status: ProductSourceStatus = {
     amazon: isAmazonKeyConfigured() ? 'failed' : 'missing',
+    bestBuy: isBestBuyKeyConfigured() ? 'failed' : 'missing',
     dummyJson: 'unknown',
     fakeStore: 'unknown',
     youtube: isYoutubeKeyConfigured() ? 'configured' : 'missing',
@@ -60,6 +64,19 @@ async function gatherProducts(forceMock: boolean): Promise<{ raw: Product[]; sta
       return { raw: [...mockProducts, ...amzProducts], status };
     } catch {
       status.amazon = 'failed';
+    }
+  }
+
+  // Best Buy — real retail catalogue, API-key only (no OAuth)
+  if (isBestBuyKeyConfigured()) {
+    try {
+      const bbProducts = await fetchBestBuyProducts();
+      if (bbProducts.length === 0) throw new Error('Best Buy returned no products');
+      status.bestBuy = 'ok';
+      status.activeSource = 'bestbuy';
+      return { raw: [...mockProducts, ...bbProducts], status };
+    } catch {
+      status.bestBuy = 'failed';
     }
   }
 
@@ -101,11 +118,14 @@ export async function loadScoredProducts(options?: { forceMock?: boolean; refres
     }
   }
 
-  // Score everything in parallel. Each scoring call may hit YouTube (or mock) for buzz.
+  // Score everything in parallel. Fetch YouTube + Reddit buzz concurrently per product.
   const scored = await Promise.all(
     unique.map(async (product) => {
-      const socialBuzz = await fetchSocialBuzzScore(product.title, product.category);
-      return buildScore(product, { socialBuzz });
+      const [socialBuzz, redditBuzz] = await Promise.all([
+        fetchSocialBuzzScore(product.title, product.category),
+        fetchRedditBuzzByCategory(product.category),
+      ]);
+      return buildScore(product, { socialBuzz, redditBuzz });
     }),
   );
 
@@ -128,12 +148,18 @@ export function clearProductCache(): void {
 }
 
 export async function probeProductSources(): Promise<ProductSourceStatus> {
-  const [amzOk, djOk, fsOk] = await Promise.all([pingAmazon(), pingDummyJson(), pingFakeStore()]);
+  const [amzOk, bbOk, djOk, fsOk] = await Promise.all([
+    pingAmazon(),
+    pingBestBuy(),
+    pingDummyJson(),
+    pingFakeStore(),
+  ]);
   return {
     amazon: isAmazonKeyConfigured() ? (amzOk ? 'ok' : 'failed') : 'missing',
+    bestBuy: isBestBuyKeyConfigured() ? (bbOk ? 'ok' : 'failed') : 'missing',
     dummyJson: djOk ? 'ok' : 'failed',
     fakeStore: fsOk ? 'ok' : 'failed',
     youtube: isYoutubeKeyConfigured() ? 'configured' : 'missing',
-    activeSource: amzOk ? 'amazon' : djOk ? 'dummyjson' : fsOk ? 'fakestore' : 'mock',
+    activeSource: amzOk ? 'amazon' : bbOk ? 'bestbuy' : djOk ? 'dummyjson' : fsOk ? 'fakestore' : 'mock',
   };
 }

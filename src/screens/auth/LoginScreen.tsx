@@ -72,6 +72,10 @@ interface FloatingInputProps {
   clearOnChange?: () => void;
 }
 
+const FLOAT_TRANSLATE_Y = -vs(22);
+const FLOAT_FONT_DEFAULT = ms(15);
+const FLOAT_FONT_FLOATED = ms(11);
+
 const FloatingInput: React.FC<FloatingInputProps> = ({
   label, value, onChangeText, onBlur, onFocus, secureTextEntry,
   autoCapitalize = 'none', keyboardType = 'default',
@@ -82,9 +86,9 @@ const FloatingInput: React.FC<FloatingInputProps> = ({
 
   const labelStyle = useAnimatedStyle(() => ({
     transform: [
-      { translateY: interpolate(floatAnim.value, [0, 1], [0, -vs(22)], Extrapolation.CLAMP) },
+      { translateY: interpolate(floatAnim.value, [0, 1], [0, FLOAT_TRANSLATE_Y], Extrapolation.CLAMP) },
     ],
-    fontSize: interpolate(floatAnim.value, [0, 1], [ms(15), ms(11)], Extrapolation.CLAMP),
+    fontSize: interpolate(floatAnim.value, [0, 1], [FLOAT_FONT_DEFAULT, FLOAT_FONT_FLOATED], Extrapolation.CLAMP),
     color: isFocused
       ? colors.accent
       : floatAnim.value > 0.5

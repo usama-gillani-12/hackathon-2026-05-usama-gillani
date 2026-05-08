@@ -211,7 +211,7 @@ export const ProductDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   return (
     <View style={styles.safe}>
       {/* ── Floating top bar (back + share) ── */}
-      <View style={[styles.topBar, { paddingTop: insets.top + vs(6) }]} pointerEvents="box-none">
+      <View style={[styles.topBar, ]} pointerEvents="box-none">
         <FloatingIconBtn icon="chevron-left" onPress={handleBackPress} />
         <FloatingIconBtn
           icon={inWatchlist ? 'star' : 'star-outline'}
@@ -555,8 +555,8 @@ export const ProductDetailScreen: React.FC<Props> = ({ navigation, route }) => {
         )}
 
         {/* Action buttons */}
-        <View style={styles.actionsWrap}>
-          <SpringTouchable onPress={toggleWatchlist} style={styles.watchlistBtn}>
+        <View style={[styles.actionsWrap,]}>
+          <TouchableOpacity onPress={toggleWatchlist} style={[styles.watchlistBtn,{}]}>
             <MaterialCommunityIcons
               name={inWatchlist ? 'star' : 'star-outline'}
               size={ms(18)}
@@ -569,7 +569,7 @@ export const ProductDetailScreen: React.FC<Props> = ({ navigation, route }) => {
             >
               {inWatchlist ? 'Saved to Watchlist' : 'Save to Watchlist'}
             </AppText>
-          </SpringTouchable>
+          </TouchableOpacity>
 
           <View style={styles.actionsRow}>
             <SpringTouchable
@@ -585,7 +585,7 @@ export const ProductDetailScreen: React.FC<Props> = ({ navigation, route }) => {
             <SpringTouchable
               onPress={() => { hapticMedium(); navigation.navigate('ProductTestPlan', { productId: scored.product.id }); }}
               disabled={isLocked}
-              style={[styles.halfBtn, isLocked && styles.halfBtnDisabled]}
+              style={[styles.halfBtn, isLocked && styles.halfBtnDisabled,]}
             >
               <LinearGradient
                 colors={isLocked ? [colors.mutedSoft, colors.mutedSoft] : gradients.success}
@@ -761,12 +761,14 @@ const styles = StyleSheet.create({
   // ── Floating top bar ──
   topBar: {
     position: 'absolute',
-    top: 0, left: 0, right: 0,
-    zIndex: 10,
+    //backgroundColor:'red',
+    top: 10, left: 0, right: 0,
+    zIndex: 100,
     flexDirection: 'row',
-    alignItems: 'center',
+    //alignItems: 'center',
     gap: s(10),
     paddingHorizontal: spacing.lg,
+    //paddingTop: insets.top + vs(6)
   },
 
   // ── Hero carousel ──

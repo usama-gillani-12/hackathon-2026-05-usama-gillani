@@ -33,6 +33,7 @@ interface Props {
 }
 
 const CANCEL_WIDTH = s(60);
+const CANCEL_FULL_MARGIN = CANCEL_WIDTH + s(8);
 
 export const SearchBar: React.FC<Props> = ({
   value,
@@ -52,7 +53,7 @@ export const SearchBar: React.FC<Props> = ({
   }, [focused]);
 
   const barStyle = useAnimatedStyle(() => ({
-    marginRight: interpolate(cancelAnim.value, [0, 1], [0, CANCEL_WIDTH + s(8)], Extrapolation.CLAMP),
+    marginRight: interpolate(cancelAnim.value, [0, 1], [0, CANCEL_FULL_MARGIN], Extrapolation.CLAMP),
   }));
 
   const cancelStyle = useAnimatedStyle(() => ({

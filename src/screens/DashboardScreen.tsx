@@ -49,7 +49,7 @@ import { SparklineSvg } from '../components/SparklineSvg';
 import { DashboardStats, ScoredProduct } from '../types/product';
 import { MarketPulseItem, TrendingPost } from '../types/market';
 import { fetchMarketPulse, MARKET_PULSE_FALLBACK } from '../api/redditMarketApi';
-import { fetchTrendingPosts } from '../api/hackerNewsApi';
+import { fetchTrendingPosts } from '../api/redditTrendingApi';
 
 type Props = BottomTabScreenProps<BottomTabParamList, 'Dashboard'>;
 
@@ -387,7 +387,7 @@ export const DashboardScreen: React.FC<Props> = () => {
     <SafeAreaView style={styles.safe} edges={[]}>
       {/* ── Sticky compact header (BlurView, fades in past 80px scroll) ── */}
       <Animated.View
-        pointerEvents="box-none"
+        pointerEvents="none"
         style={[
           styles.stickyHeader,
           { paddingTop: insets.top + ms(6) },
@@ -397,7 +397,7 @@ export const DashboardScreen: React.FC<Props> = () => {
         {Platform.OS === 'ios' ? (
           <BlurView
             blurType="dark"
-            blurAmount={22}
+            blurAmount={1}
             reducedTransparencyFallbackColor={colors.heroDark}
             style={StyleSheet.absoluteFill}
           />
@@ -601,17 +601,15 @@ export const DashboardScreen: React.FC<Props> = () => {
                   <MaterialCommunityIcons name={m.icon} size={ms(17)} color={m.color} />
                 </View>
                 <CountUp target={m.value} color={m.color} />
-                <AppText variant="caption2" uppercase color={colors.muted}>
+                <AppText variant="caption2" uppercase color={colors.muted} numberOfLines={1}>
                   {m.label}
                 </AppText>
-                {m.value > 0 && (
-                  <View style={styles.metricTrend}>
-                    <MaterialCommunityIcons name="arrow-top-right" size={ms(10)} color={colors.success} />
-                    <AppText variant="caption2" color={colors.success}>
-                      Live
-                    </AppText>
-                  </View>
-                )}
+                <View style={[styles.metricTrend, m.value === 0 && styles.metricTrendHidden]}>
+                  <MaterialCommunityIcons name="arrow-top-right" size={ms(10)} color={colors.success} />
+                  <AppText variant="caption2" color={colors.success}>
+                    Live
+                  </AppText>
+                </View>
               </View>
             </Animated.View>
           ))}
@@ -710,13 +708,13 @@ export const DashboardScreen: React.FC<Props> = () => {
             <View style={styles.sectionHeader}>
               <View>
                 <Text style={styles.sectionTitle}>What's Trending</Text>
-                <Text style={styles.sectionSub}>Latest product launches on Hacker News</Text>
+                <Text style={styles.sectionSub}>Trending e-commerce products on Reddit</Text>
               </View>
               <TouchableOpacity
-                onPress={() => Linking.openURL('https://news.ycombinator.com/show')}
+                onPress={() => Linking.openURL('https://www.reddit.com/r/shutupandtakemymoney/top/?t=week')}
                 style={styles.hnBadge}
               >
-                <Text style={styles.hnBadgeText}>Hacker News ↗</Text>
+                <Text style={styles.hnBadgeText}>Reddit ↗</Text>
               </TouchableOpacity>
             </View>
 
@@ -1094,9 +1092,12 @@ const styles = StyleSheet.create({
   },
   metricCard: { flex: 1 },
   metricInner: {
+    flex: 1,
+    minHeight: ms(132),
     borderRadius: radius.xxl,
     padding: ms(12),
     alignItems: 'center',
+    justifyContent: 'center',
     gap: vs(4),
     backgroundColor: CARD_BG,
     borderWidth: StyleSheet.hairlineWidth,
@@ -1117,6 +1118,7 @@ const styles = StyleSheet.create({
     gap: s(2),
     marginTop: vs(2),
   },
+  metricTrendHidden: { opacity: 0 },
 
   // ── Sticky compact header
   stickyHeader: {

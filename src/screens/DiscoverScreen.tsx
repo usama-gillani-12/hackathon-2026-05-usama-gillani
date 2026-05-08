@@ -2,23 +2,30 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   FlatList,
-  Pressable,
   ScrollView,
   StyleSheet,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Text } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'react-native-linear-gradient';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import Animated, {
+  FadeIn,
+  FadeInDown,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
 import { useNavigation } from '@react-navigation/native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { EmptyState } from '../components/EmptyState';
 import { ListFooterLoader } from '../components/ListFooterLoader';
 import { ProductCard } from '../components/ProductCard';
+import { SearchBar } from '../components/SearchBar';
+import { DiscoverSkeleton } from '../components/skeletons/DiscoverSkeleton';
 import { usePaginatedList } from '../hooks/usePaginatedList';
 import {
   fetchAmazonBestSellers,
@@ -28,52 +35,34 @@ import {
 } from '../api/amazonApi';
 import { buildScore } from '../services/scoringService';
 import { Product, ScoredProduct } from '../types/product';
-import { colors } from '../theme/colors';
-import { radius, spacing } from '../theme/spacing';
+import { colors, gradients } from '../theme/colors';
+import { radius, spacing, shadow } from '../theme/spacing';
 import { ms, s, vs } from '../theme/responsive';
+import { hapticLight, hapticMedium } from '../utils/haptics';
+import { AppText } from '../components/AppText';
 
-// ─── Category configuration ──────────────────────────────────────────────────
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const RECENT_SEARCHES_KEY = '@trendpro/recent_searches';
+const MAX_RECENT = 5;
 
 interface Category {
   label: string;
   emoji: string;
-  key: string; // matches the Amazon API category id
+  key: string;
 }
 
-// Emoji per Amazon category id (from /categories?country=US response)
 const CATEGORY_EMOJI: Record<string, string> = {
-  electronics: '📱',
-  beauty: '💄',
-  'luxury-beauty': '✨',
-  sports: '⚽',
-  kitchen: '🏠',
-  fashion: '👗',
-  'fashion-womens': '👗',
-  'fashion-mens': '👔',
-  'fashion-girls': '🎀',
-  'fashion-boys': '👦',
-  'fashion-baby': '🍼',
-  'fashion-luggage': '🧳',
-  toys: '🧸',
-  stripbooks: '📚',
-  pets: '🐾',
-  baby: '👶',
-  drugstore: '💊',
-  automotive: '🚗',
-  computers: '💻',
-  outdoor: '🌿',
-  lighting: '💡',
-  diy: '🔧',
-  videogames: '🎮',
-  mi: '🎸',
-  'office-products': '📎',
-  grocery: '🛒',
-  handmade: '🧶',
-  industrial: '⚙️',
-  appliances: '🔌',
+  electronics: '📱', beauty: '💄', 'luxury-beauty': '✨', sports: '⚽',
+  kitchen: '🏠', fashion: '👗', 'fashion-womens': '👗', 'fashion-mens': '👔',
+  'fashion-girls': '🎀', 'fashion-boys': '👦', 'fashion-baby': '🍼',
+  'fashion-luggage': '🧳', toys: '🧸', stripbooks: '📚', pets: '🐾',
+  baby: '👶', drugstore: '💊', automotive: '🚗', computers: '💻',
+  outdoor: '🌿', lighting: '💡', diy: '🔧', videogames: '🎮',
+  mi: '🎸', 'office-products': '📎', grocery: '🛒', handmade: '🧶',
+  industrial: '⚙️', appliances: '🔌',
 };
 
-// Only show categories that carry physical, shippable products
 const PHYSICAL_CATEGORY_IDS = new Set([
   'electronics', 'beauty', 'luxury-beauty', 'sports', 'kitchen',
   'fashion', 'fashion-womens', 'fashion-mens', 'fashion-girls', 'fashion-boys',
@@ -83,47 +72,116 @@ const PHYSICAL_CATEGORY_IDS = new Set([
   'appliances',
 ]);
 
-// Shown immediately while the API category list loads
 const FALLBACK_CATEGORIES: Category[] = [
   { label: 'Electronics', emoji: '📱', key: 'electronics' },
   { label: 'Beauty', emoji: '💄', key: 'beauty' },
-  { label: 'Sports & Outdoors', emoji: '⚽', key: 'sports' },
+  { label: 'Sports', emoji: '⚽', key: 'sports' },
   { label: 'Home & Kitchen', emoji: '🏠', key: 'kitchen' },
   { label: 'Fashion', emoji: '👗', key: 'fashion' },
   { label: 'Toys & Games', emoji: '🧸', key: 'toys' },
-  { label: 'Pet Supplies', emoji: '🐾', key: 'pets' },
+  { label: 'Pets', emoji: '🐾', key: 'pets' },
   { label: 'Baby', emoji: '👶', key: 'baby' },
-  { label: 'Health & Care', emoji: '💊', key: 'drugstore' },
+  { label: 'Health', emoji: '💊', key: 'drugstore' },
   { label: 'Books', emoji: '📚', key: 'stripbooks' },
   { label: 'Automotive', emoji: '🚗', key: 'automotive' },
   { label: 'Computers', emoji: '💻', key: 'computers' },
-  { label: 'Garden & Outdoors', emoji: '🌿', key: 'outdoor' },
+  { label: 'Outdoors', emoji: '🌿', key: 'outdoor' },
   { label: 'Lighting', emoji: '💡', key: 'lighting' },
   { label: 'DIY & Tools', emoji: '🔧', key: 'diy' },
   { label: 'Video Games', emoji: '🎮', key: 'videogames' },
-  { label: 'Music Instruments', emoji: '🎸', key: 'mi' },
-  { label: 'Office Supplies', emoji: '📎', key: 'office-products' },
-];
-
-const TRENDING_SEARCHES = [
-  'Wireless earbuds',
-  'LED face mask',
-  'Pet water fountain',
-  'Posture corrector',
-  'Mini projector',
+  { label: 'Instruments', emoji: '🎸', key: 'mi' },
+  { label: 'Office', emoji: '📎', key: 'office-products' },
 ];
 
 function scoreProducts(products: Product[]): ScoredProduct[] {
   return products.map((p) => buildScore(p, { socialBuzz: 55 }));
 }
 
+// ─── Recent searches persistence ─────────────────────────────────────────────
+
+async function loadRecentSearches(): Promise<string[]> {
+  try {
+    const raw = await AsyncStorage.getItem(RECENT_SEARCHES_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+async function saveRecentSearch(query: string, current: string[]): Promise<string[]> {
+  const trimmed = query.trim();
+  if (!trimmed) return current;
+  const deduped = [trimmed, ...current.filter((q) => q !== trimmed)].slice(0, MAX_RECENT);
+  try {
+    await AsyncStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(deduped));
+  } catch { /* silent */ }
+  return deduped;
+}
+
+async function clearRecentSearches(): Promise<void> {
+  try {
+    await AsyncStorage.removeItem(RECENT_SEARCHES_KEY);
+  } catch { /* silent */ }
+}
+
+// ─── Category chip with spring bounce ─────────────────────────────────────────
+
+const CategoryChip: React.FC<{
+  category: Category;
+  active: boolean;
+  onPress: () => void;
+}> = ({ category, active, onPress }) => {
+  const scale = useSharedValue(1);
+
+  const animStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  const handlePress = () => {
+    hapticLight();
+    scale.value = withSpring(0.92, { damping: 12, stiffness: 300 }, () => {
+      scale.value = withSpring(1, { damping: 14, stiffness: 260 });
+    });
+    onPress();
+  };
+
+  return (
+    <Animated.View style={animStyle}>
+      <TouchableOpacity
+        onPress={handlePress}
+        activeOpacity={0.85}
+        style={[styles.chip, active && styles.chipActive]}
+      >
+        {active ? (
+          <LinearGradient
+            colors={gradients.premium}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.chipGradient}
+          >
+            <AppText style={styles.chipEmoji}>{category.emoji}</AppText>
+            <AppText variant="caption1" color={colors.white} style={styles.chipLabelActive} numberOfLines={1}>
+              {category.label}
+            </AppText>
+          </LinearGradient>
+        ) : (
+          <View style={styles.chipInner}>
+            <AppText style={styles.chipEmoji}>{category.emoji}</AppText>
+            <AppText variant="caption1" color={colors.textCaption} style={styles.chipLabel} numberOfLines={1}>
+              {category.label}
+            </AppText>
+          </View>
+        )}
+      </TouchableOpacity>
+    </Animated.View>
+  );
+};
+
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
 export const DiscoverScreen: React.FC = () => {
   const navigation = useNavigation<any>();
-  const searchRef = useRef<TextInput>(null);
 
-  // Category list — populated from API, falls back to FALLBACK_CATEGORIES
   const [categories, setCategories] = useState<Category[]>(FALLBACK_CATEGORIES);
   const [loadingCategories, setLoadingCategories] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<Category>(FALLBACK_CATEGORIES[0]);
@@ -133,28 +191,24 @@ export const DiscoverScreen: React.FC = () => {
   const [loadingBestSellers, setLoadingBestSellers] = useState(false);
   const [loadingDeals, setLoadingDeals] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
 
-  // Load categories from API on mount so IDs are always up-to-date
+  // Load categories from API
   useEffect(() => {
+    loadRecentSearches().then(setRecentSearches);
     if (!isAmazonKeyConfigured()) return;
     setLoadingCategories(true);
     fetchAmazonCategories()
       .then((apiCats) => {
         const physical = apiCats
           .filter((c) => PHYSICAL_CATEGORY_IDS.has(c.id))
-          .map((c) => ({
-            label: c.name.trim(),
-            emoji: CATEGORY_EMOJI[c.id] ?? '🛍️',
-            key: c.id,
-          }));
-        if (physical.length > 0) {
-          setCategories(physical);
-          setSelectedCategory(physical[0]);
-        }
+          .map((c) => ({ label: c.name.trim(), emoji: CATEGORY_EMOJI[c.id] ?? '🛍️', key: c.id }));
+        if (physical.length > 0) { setCategories(physical); setSelectedCategory(physical[0]); }
       })
-      .catch(() => { /* keep FALLBACK_CATEGORIES */ })
+      .catch(() => { /* keep fallback */ })
       .finally(() => setLoadingCategories(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -165,11 +219,8 @@ export const DiscoverScreen: React.FC = () => {
     setBestSellers([]);
     try {
       const raw = await fetchAmazonBestSellers(categoryKey);
-      if (raw.length === 0) {
-        setError('No products found for this category. Try another one.');
-      } else {
-        setBestSellers(scoreProducts(raw));
-      }
+      if (raw.length === 0) setError('No products found for this category. Try another one.');
+      else setBestSellers(scoreProducts(raw));
     } catch {
       setError('Could not load products. Check your connection and try again.');
     } finally {
@@ -182,30 +233,21 @@ export const DiscoverScreen: React.FC = () => {
     try {
       const raw = await fetchAmazonDeals();
       setDeals(scoreProducts(raw));
-    } catch {
-      // deals section is optional — silent fail is fine
-    } finally {
-      setLoadingDeals(false);
-    }
+    } catch { /* silent */ }
+    finally { setLoadingDeals(false); }
   }, []);
 
-  useEffect(() => {
-    loadBestSellers(selectedCategory.key);
-  }, [selectedCategory, loadBestSellers]);
-
-  useEffect(() => {
-    loadDeals();
-  }, [loadDeals]);
+  useEffect(() => { loadBestSellers(selectedCategory.key); }, [selectedCategory, loadBestSellers]);
+  useEffect(() => { loadDeals(); }, [loadDeals]);
 
   const filteredBestSellers = useMemo(
-    () =>
-      searchQuery.trim()
-        ? bestSellers.filter(
-            (s) =>
-              s.product.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-              s.product.category.toLowerCase().includes(searchQuery.toLowerCase()),
-          )
-        : bestSellers,
+    () => searchQuery.trim()
+      ? bestSellers.filter(
+          (s) =>
+            s.product.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            s.product.category.toLowerCase().includes(searchQuery.toLowerCase()),
+        )
+      : bestSellers,
     [bestSellers, searchQuery],
   );
 
@@ -216,11 +258,38 @@ export const DiscoverScreen: React.FC = () => {
     navigation.navigate('ProductDetail', { productId: scored.product.id });
   };
 
+  const commitSearch = async (query: string) => {
+    if (!query.trim()) return;
+    const updated = await saveRecentSearch(query, recentSearches);
+    setRecentSearches(updated);
+  };
+
+  const applyQuery = (query: string) => {
+    hapticLight();
+    setSearchQuery(query);
+    setSearchFocused(false);
+    commitSearch(query);
+  };
+
+  const handleCancelSearch = () => {
+    setSearchFocused(false);
+    setSearchQuery('');
+  };
+
+  const handleClearRecent = async () => {
+    hapticMedium();
+    await clearRecentSearches();
+    setRecentSearches([]);
+  };
+
+  // Show suggestions panel when focused and no text typed yet
+  const showSuggestions = searchFocused && searchQuery.length === 0;
+
   if (!isAmazonKeyConfigured()) {
     return (
-      <SafeAreaView style={styles.safe}>
+      <SafeAreaView style={styles.safe} edges={[]}>
         <View style={styles.header}>
-          <Text style={styles.title}>Discover</Text>
+          <AppText variant="title2" color={colors.textPrimary}>Discover</AppText>
         </View>
         <EmptyState
           icon="🔑"
@@ -239,59 +308,89 @@ export const DiscoverScreen: React.FC = () => {
   }
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeAreaView style={styles.safe} edges={[]}>
 
       {/* ── Header ── */}
       <View style={styles.header}>
         <View style={styles.headerRow}>
           <View>
-            <Text style={styles.title}>Discover</Text>
-            <Text style={styles.subtitle}>Live Amazon intelligence</Text>
+            <AppText variant="title2" color={colors.textPrimary} style={styles.title}>Discover</AppText>
+            <AppText variant="caption1" color={colors.textCaption}>Live Amazon intelligence</AppText>
           </View>
           <View style={styles.liveBadge}>
             <View style={styles.liveDot} />
-            <Text style={styles.liveText}>Live</Text>
+            <AppText variant="caption2" color={colors.success} uppercase>Live</AppText>
           </View>
         </View>
 
-        {/* Search bar */}
-        <Pressable
-          style={[styles.searchBar, searchFocused && styles.searchBarFocused]}
-          onPress={() => searchRef.current?.focus()}
-        >
-          <MaterialCommunityIcons
-            name="magnify"
-            size={ms(18)}
-            color={searchFocused ? colors.accent : colors.muted}
-          />
-          <TextInput
-            ref={searchRef}
-            style={styles.searchInput}
-            placeholder="Search products, categories…"
-            placeholderTextColor={colors.muted}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            onFocus={() => setSearchFocused(true)}
-            onBlur={() => setSearchFocused(false)}
-            returnKeyType="search"
-          />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <MaterialCommunityIcons name="close-circle" size={ms(16)} color={colors.muted} />
-            </TouchableOpacity>
-          )}
-        </Pressable>
+        {/* iOS-native search bar */}
+        <SearchBar
+          value={searchQuery}
+          onChangeText={(t) => { setSearchQuery(t); }}
+          onFocus={() => setSearchFocused(true)}
+          onBlur={() => {
+            if (searchQuery.trim()) commitSearch(searchQuery);
+            setSearchFocused(false);
+          }}
+          onCancel={handleCancelSearch}
+          focused={searchFocused}
+        />
       </View>
 
-      {/* ── Category strip ── */}
+      {/* ── Recent / trending suggestions overlay ── */}
+      {showSuggestions && (
+        <Animated.View entering={FadeInDown.duration(180)} style={styles.suggestionsPanel}>
+          {recentSearches.length > 0 ? (
+            <>
+              <View style={styles.suggestionsHeader}>
+                <AppText variant="caption2" color={colors.textCaption} uppercase style={styles.suggestionsLabel}>
+                  Recent
+                </AppText>
+                <TouchableOpacity onPress={handleClearRecent} hitSlop={{ top: 6, bottom: 6 }}>
+                  <AppText variant="footnote" color={colors.accent}>Clear</AppText>
+                </TouchableOpacity>
+              </View>
+              {recentSearches.map((term) => (
+                <TouchableOpacity
+                  key={term}
+                  onPress={() => applyQuery(term)}
+                  style={styles.recentRow}
+                  activeOpacity={0.7}
+                >
+                  <MaterialCommunityIcons name="history" size={ms(15)} color={colors.textCaption} />
+                  <AppText variant="body" color={colors.textPrimary} style={styles.recentText}>{term}</AppText>
+                  <MaterialCommunityIcons name="arrow-top-left" size={ms(14)} color={colors.textCaption} />
+                </TouchableOpacity>
+              ))}
+            </>
+          ) : (
+            <>
+              <AppText variant="caption2" color={colors.textCaption} uppercase style={styles.suggestionsLabel}>
+                Trending searches
+              </AppText>
+              <View style={styles.trendingChips}>
+                {['Wireless earbuds', 'LED face mask', 'Pet fountain', 'Posture corrector', 'Mini projector'].map((term) => (
+                  <TouchableOpacity
+                    key={term}
+                    onPress={() => applyQuery(term)}
+                    style={styles.trendingChip}
+                    activeOpacity={0.75}
+                  >
+                    <MaterialCommunityIcons name="trending-up" size={ms(11)} color={colors.accent} />
+                    <AppText variant="caption1" color={colors.accent}>{term}</AppText>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </>
+          )}
+        </Animated.View>
+      )}
+
+      {/* ── Category chip strip ── */}
       {!searchQuery && (
         <View style={styles.categoryStrip}>
           {loadingCategories ? (
-            <ActivityIndicator
-              size="small"
-              color={colors.accent}
-              style={styles.categoryLoader}
-            />
+            <ActivityIndicator size="small" color={colors.accent} style={{ alignSelf: 'center' }} />
           ) : (
             <ScrollView
               horizontal
@@ -299,173 +398,156 @@ export const DiscoverScreen: React.FC = () => {
               contentContainerStyle={styles.categoryRow}
               decelerationRate="fast"
             >
-              {categories.map((cat) => {
-                const active = cat.key === selectedCategory.key;
-                return (
-                  <Pressable
-                    key={cat.key}
-                    onPress={() => setSelectedCategory(cat)}
-                    style={[styles.chip, active && styles.chipActive]}
-                  >
-                    <Text style={styles.chipEmoji}>{cat.emoji}</Text>
-                    <Text
-                      style={[styles.chipLabel, active && styles.chipLabelActive]}
-                      numberOfLines={1}
-                    >
-                      {cat.label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
+              {categories.map((cat) => (
+                <CategoryChip
+                  key={cat.key}
+                  category={cat}
+                  active={cat.key === selectedCategory.key}
+                  onPress={() => setSelectedCategory(cat)}
+                />
+              ))}
             </ScrollView>
           )}
         </View>
       )}
 
-      {/* ── Trending search suggestions ── */}
-      {searchQuery.length === 0 && searchFocused && (
-        <Animated.View entering={FadeInDown.duration(200)} style={styles.suggestionsWrap}>
-          <Text style={styles.suggestionsLabel}>TRENDING SEARCHES</Text>
-          <View style={styles.suggestionChips}>
-            {TRENDING_SEARCHES.map((term) => (
-              <TouchableOpacity
-                key={term}
-                onPress={() => {
-                  setSearchQuery(term);
-                  searchRef.current?.blur();
-                }}
-                style={styles.suggestionChip}
-              >
-                <MaterialCommunityIcons name="trending-up" size={ms(12)} color={colors.accent} />
-                <Text style={styles.suggestionText}>{term}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </Animated.View>
-      )}
+      {/* ── Product list / skeleton / error ── */}
+      {loadingBestSellers && bestSellers.length === 0 ? (
+        <DiscoverSkeleton />
+      ) : (
+        <FlatList
+          data={pagedBestSellers}
+          keyExtractor={(item) => item.product.id}
+          contentContainerStyle={styles.list}
+          showsVerticalScrollIndicator={false}
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.3}
+          ListHeaderComponent={
+            <>
+              {/* Category banner */}
+              {!searchQuery && (
+                <Animated.View entering={FadeIn.duration(300)}>
+                  <LinearGradient
+                    colors={[colors.heroDark, colors.heroMid]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.categoryBanner}
+                  >
+                    <AppText style={styles.bannerEmoji}>{selectedCategory.emoji}</AppText>
+                    <View style={styles.bannerContent}>
+                      <AppText variant="caption2" color="rgba(255,255,255,0.45)" uppercase style={styles.bannerLabel}>
+                        Best Sellers
+                      </AppText>
+                      <AppText variant="title3" color={colors.white} numberOfLines={1} style={styles.bannerTitle}>
+                        {selectedCategory.label}
+                      </AppText>
+                      <AppText variant="caption1" color="rgba(255,255,255,0.45)">
+                        {loadingBestSellers ? 'Fetching live data…' : `${total} products · Amazon US`}
+                      </AppText>
+                    </View>
+                    <View style={styles.bannerBadge}>
+                      <MaterialCommunityIcons name="amazon" size={ms(20)} color="rgba(255,255,255,0.5)" />
+                    </View>
+                  </LinearGradient>
+                </Animated.View>
+              )}
 
-      {/* ── Product list ── */}
-      <FlatList
-        data={pagedBestSellers}
-        keyExtractor={(item) => item.product.id}
-        contentContainerStyle={styles.list}
-        showsVerticalScrollIndicator={false}
-        onEndReached={loadMore}
-        onEndReachedThreshold={0.3}
-        ListHeaderComponent={
-          <>
-            {!searchQuery && (
-              <LinearGradient
-                colors={[colors.heroDark, colors.heroMid]}
-                style={styles.categoryBanner}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-              >
-                <Text style={styles.bannerEmoji}>{selectedCategory.emoji}</Text>
-                <View style={styles.bannerContent}>
-                  <Text style={styles.bannerLabel}>BEST SELLERS</Text>
-                  <Text style={styles.bannerTitle} numberOfLines={1}>
-                    {selectedCategory.label}
-                  </Text>
-                  <Text style={styles.bannerSub}>
-                    {loadingBestSellers
-                      ? 'Fetching live data…'
-                      : `${total} products · Amazon US`}
-                  </Text>
-                </View>
-                <View style={styles.bannerBadge}>
-                  <MaterialCommunityIcons name="amazon" size={ms(20)} color="rgba(255,255,255,0.5)" />
-                </View>
-              </LinearGradient>
-            )}
+              {/* Section title */}
+              <AppText variant="headline" color={colors.textPrimary} style={styles.sectionTitle}>
+                {searchQuery ? `Results for "${searchQuery}" · ${total}` : `Best Sellers · ${selectedCategory.label}`}
+              </AppText>
 
-            <Text style={styles.sectionTitle}>
-              {searchQuery
-                ? `Results for "${searchQuery}" · ${total}`
-                : `Best Sellers · ${selectedCategory.label}`}
-            </Text>
-
-            {loadingBestSellers && (
-              <View style={styles.loadingWrap}>
-                <ActivityIndicator color={colors.accent} size="small" />
-                <Text style={styles.loadingText}>
-                  Fetching {selectedCategory.label} from Amazon…
-                </Text>
-              </View>
-            )}
-
-            {error && !loadingBestSellers && (
-              <View style={styles.errorWrap}>
-                <MaterialCommunityIcons name="alert-circle-outline" size={ms(16)} color={colors.danger} />
-                <Text style={styles.errorText}>{error}</Text>
-                <TouchableOpacity
-                  onPress={() => loadBestSellers(selectedCategory.key)}
-                  style={styles.retryBtn}
-                >
-                  <Text style={styles.retryText}>Retry</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          </>
-        }
-        ListFooterComponent={
-          <>
-            <ListFooterLoader
-              isLoadingMore={isLoadingMore}
-              hasMore={hasMore}
-              total={total}
-              shown={pagedBestSellers.length}
-              label="products"
-            />
-            {bestSellers.length > 0 && !searchQuery && (
-              <>
-                <Text style={[styles.sectionTitle, { marginTop: vs(24) }]}>
-                  🔥 Deals &amp; Offers
-                </Text>
-                {loadingDeals ? (
-                  <View style={styles.loadingWrap}>
-                    <ActivityIndicator color={colors.accent} size="small" />
-                    <Text style={styles.loadingText}>Loading deals…</Text>
+              {/* Error state */}
+              {error && !loadingBestSellers && (
+                <Animated.View entering={FadeIn.duration(200)} style={styles.errorCard}>
+                  <MaterialCommunityIcons name="alert-circle-outline" size={ms(18)} color={colors.danger} />
+                  <View style={{ flex: 1, gap: vs(6) }}>
+                    <AppText variant="footnote" color={colors.danger}>{error}</AppText>
+                    <TouchableOpacity
+                      onPress={() => { hapticMedium(); loadBestSellers(selectedCategory.key); }}
+                      style={styles.retryBtn}
+                    >
+                      <AppText variant="caption2" color={colors.white} uppercase>Retry</AppText>
+                    </TouchableOpacity>
                   </View>
-                ) : deals.length > 0 ? (
-                  deals.map((scored) => (
-                    <ProductCard
-                      key={scored.product.id}
-                      scored={scored}
-                      isLocked={false}
-                      onPress={() => handleProductPress(scored)}
-                      style={{ marginBottom: spacing.md }}
-                    />
-                  ))
+                </Animated.View>
+              )}
+            </>
+          }
+          renderItem={({ item, index }) => (
+            <Animated.View entering={FadeInDown.delay(index * 30).duration(260)}>
+              <ProductCard
+                scored={item}
+                isLocked={false}
+                onPress={() => handleProductPress(item)}
+                style={{ marginBottom: spacing.md }}
+              />
+            </Animated.View>
+          )}
+          ListFooterComponent={
+            <>
+              <ListFooterLoader
+                isLoadingMore={isLoadingMore}
+                hasMore={hasMore}
+                total={total}
+                shown={pagedBestSellers.length}
+                label="products"
+              />
+              {/* Deals section */}
+              {bestSellers.length > 0 && !searchQuery && (
+                <View style={{ marginTop: vs(8) }}>
+                  <AppText variant="headline" color={colors.textPrimary} style={styles.sectionTitle}>
+                    🔥 Deals &amp; Offers
+                  </AppText>
+                  {loadingDeals ? (
+                    <View style={styles.loadingWrap}>
+                      <ActivityIndicator color={colors.accent} size="small" />
+                      <AppText variant="footnote" color={colors.textCaption}>Loading deals…</AppText>
+                    </View>
+                  ) : deals.length > 0 ? (
+                    deals.map((scored) => (
+                      <ProductCard
+                        key={scored.product.id}
+                        scored={scored}
+                        isLocked={false}
+                        onPress={() => handleProductPress(scored)}
+                        style={{ marginBottom: spacing.md }}
+                      />
+                    ))
+                  ) : null}
+                </View>
+              )}
+            </>
+          }
+          ListEmptyComponent={
+            !loadingBestSellers && !error ? (
+              <View style={styles.emptyWrap}>
+                <AppText style={styles.emptyIllu}>{searchQuery ? '🔍' : '📦'}</AppText>
+                <AppText variant="title3" color={colors.textPrimary} center style={styles.emptyTitle}>
+                  {searchQuery ? `No results for "${searchQuery}"` : 'No products found'}
+                </AppText>
+                <AppText variant="body" color={colors.textCaption} center style={styles.emptySub}>
+                  {searchQuery ? 'Try a different search term.' : 'Try another category or pull to refresh.'}
+                </AppText>
+                {searchQuery ? (
+                  <TouchableOpacity
+                    onPress={() => { hapticLight(); setSearchQuery(''); }}
+                    style={styles.emptyResetBtn}
+                  >
+                    <LinearGradient
+                      colors={gradients.premium}
+                      start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                      style={styles.emptyResetBtnInner}
+                    >
+                      <AppText variant="callout" color={colors.white}>Clear search</AppText>
+                    </LinearGradient>
+                  </TouchableOpacity>
                 ) : null}
-              </>
-            )}
-          </>
-        }
-        renderItem={({ item, index }) => (
-          <Animated.View entering={FadeInDown.delay(index * 35).duration(280)}>
-            <ProductCard
-              scored={item}
-              isLocked={false}
-              onPress={() => handleProductPress(item)}
-              style={{ marginBottom: spacing.md }}
-            />
-          </Animated.View>
-        )}
-        ListEmptyComponent={
-          !loadingBestSellers && !error ? (
-            <EmptyState
-              icon={searchQuery ? '🔍' : '📦'}
-              title={searchQuery ? `No results for "${searchQuery}"` : 'No products found'}
-              message={
-                searchQuery
-                  ? 'Try a different search term.'
-                  : 'Try another category or pull to refresh.'
-              }
-            />
-          ) : null
-        }
-      />
+              </View>
+            ) : null
+          }
+        />
+      )}
     </SafeAreaView>
   );
 };
@@ -483,160 +565,149 @@ const styles = StyleSheet.create({
     backgroundColor: colors.card,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
+    gap: vs(10),
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
-    marginBottom: vs(12),
   },
-  title: { fontSize: ms(24), fontWeight: '800', color: colors.primary, letterSpacing: -0.5 },
-  subtitle: { fontSize: ms(12), color: colors.muted, marginTop: vs(2) },
+  title: { letterSpacing: -0.4 },
   liveBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: s(5),
     backgroundColor: colors.successSoft,
-    paddingHorizontal: s(12),
-    paddingVertical: vs(6),
+    paddingHorizontal: s(10),
+    paddingVertical: vs(5),
     borderRadius: radius.pill,
   },
   liveDot: { width: ms(7), height: ms(7), borderRadius: ms(4), backgroundColor: colors.success },
-  liveText: { fontSize: ms(12), fontWeight: '700', color: colors.success },
 
-  // Search
-  searchBar: {
+  // Suggestions panel
+  suggestionsPanel: {
+    backgroundColor: colors.card,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    paddingHorizontal: spacing.lg,
+    paddingTop: vs(12),
+    paddingBottom: vs(14),
+    gap: vs(4),
+    ...shadow.sm,
+  },
+  suggestionsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: vs(6),
+  },
+  suggestionsLabel: { letterSpacing: ms(0.8) },
+  recentRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: s(10),
-    backgroundColor: colors.mutedSoft,
-    borderRadius: radius.xl,
-    paddingHorizontal: s(14),
     paddingVertical: vs(10),
-    borderWidth: 1.5,
-    borderColor: 'transparent',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
   },
-  searchBarFocused: { borderColor: colors.accent, backgroundColor: colors.white },
-  searchInput: { flex: 1, fontSize: ms(14), color: colors.primary, padding: 0 },
+  recentText: { flex: 1 },
+  trendingChips: { flexDirection: 'row', flexWrap: 'wrap', gap: s(8), marginTop: vs(6) },
+  trendingChip: {
+    flexDirection: 'row', alignItems: 'center', gap: s(4),
+    backgroundColor: colors.accentSubtle,
+    borderRadius: radius.pill,
+    paddingHorizontal: s(12), paddingVertical: vs(6),
+    borderWidth: 1, borderColor: colors.accentSoft,
+  },
 
-  // Category strip — fixed height so it NEVER reflows when chip is selected
+  // Category strip
   categoryStrip: {
-    height: vs(56),
+    height: vs(54),
     backgroundColor: colors.card,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
     justifyContent: 'center',
   },
-  categoryLoader: { alignSelf: 'center' },
   categoryRow: {
     alignItems: 'center',
     paddingHorizontal: spacing.lg,
     gap: s(8),
   },
-
-  // Chips — fixed height, no paddingVertical so the height is always identical
   chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: vs(36),
-    paddingHorizontal: s(14),
-    gap: s(5),
     borderRadius: radius.pill,
-    backgroundColor: colors.mutedSoft,
-    borderWidth: 1.5,
+    overflow: 'hidden',
+    borderWidth: 1,
     borderColor: colors.border,
+    backgroundColor: colors.surfaceVariant,
   },
-  chipActive: {
-    backgroundColor: colors.heroMid,
-    borderColor: colors.accent,
+  chipActive: { borderColor: colors.accent },
+  chipGradient: {
+    flexDirection: 'row', alignItems: 'center',
+    height: vs(36), paddingHorizontal: s(12), gap: s(5),
+  },
+  chipInner: {
+    flexDirection: 'row', alignItems: 'center',
+    height: vs(36), paddingHorizontal: s(12), gap: s(5),
   },
   chipEmoji: { fontSize: ms(13) },
-  chipLabel: { fontSize: ms(12), fontWeight: '600', color: colors.muted },
-  chipLabelActive: { color: colors.white },
-
-  // Suggestions
-  suggestionsWrap: {
-    backgroundColor: colors.card,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: vs(14),
-  },
-  suggestionsLabel: {
-    fontSize: ms(10),
-    fontWeight: '700',
-    color: colors.muted,
-    letterSpacing: 0.8,
-    marginBottom: vs(10),
-  },
-  suggestionChips: { flexDirection: 'row', flexWrap: 'wrap', gap: s(8) },
-  suggestionChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: s(5),
-    backgroundColor: colors.accentSoft,
-    borderRadius: radius.pill,
-    paddingHorizontal: s(12),
-    paddingVertical: vs(7),
-  },
-  suggestionText: { fontSize: ms(13), fontWeight: '600', color: colors.accent },
+  chipLabel: { fontWeight: '600' },
+  chipLabelActive: { fontWeight: '700' },
 
   // List
-  list: { paddingHorizontal: spacing.lg, paddingTop: vs(16), paddingBottom: vs(32) },
+  list: { paddingHorizontal: spacing.lg, paddingTop: vs(14), paddingBottom: vs(40) },
   categoryBanner: {
     borderRadius: radius.xl,
     padding: ms(16),
     flexDirection: 'row',
     alignItems: 'center',
     gap: ms(12),
-    marginBottom: vs(16),
+    marginBottom: vs(14),
+    ...shadow.md,
   },
   bannerEmoji: { fontSize: ms(38) },
-  bannerContent: { flex: 1 },
-  bannerLabel: { fontSize: ms(10), fontWeight: '700', color: 'rgba(255,255,255,0.45)', letterSpacing: 1 },
-  bannerTitle: { fontSize: ms(20), fontWeight: '800', color: colors.white, letterSpacing: -0.5 },
-  bannerSub: { fontSize: ms(12), color: 'rgba(255,255,255,0.45)', marginTop: vs(2) },
+  bannerContent: { flex: 1, gap: vs(2) },
+  bannerLabel: { letterSpacing: ms(1) },
+  bannerTitle: { letterSpacing: -0.4 },
   bannerBadge: {
-    width: ms(40),
-    height: ms(40),
-    borderRadius: radius.lg,
+    width: ms(40), height: ms(40), borderRadius: radius.lg,
     backgroundColor: 'rgba(255,255,255,0.08)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: 'center', justifyContent: 'center',
   },
-  sectionTitle: {
-    fontSize: ms(16),
-    fontWeight: '800',
-    color: colors.primary,
-    marginBottom: vs(12),
-    letterSpacing: -0.3,
-  },
+  sectionTitle: { marginBottom: vs(12) },
+
   loadingWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: s(10),
-    marginVertical: vs(14),
-    backgroundColor: colors.mutedSoft,
-    borderRadius: radius.lg,
-    padding: ms(12),
+    flexDirection: 'row', alignItems: 'center', gap: s(10),
+    marginVertical: vs(10),
   },
-  loadingText: { fontSize: ms(13), color: colors.muted, fontWeight: '500', flex: 1 },
-  errorWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: s(8),
-    marginVertical: vs(12),
+
+  errorCard: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: s(10),
     backgroundColor: colors.dangerSoft,
     borderRadius: radius.lg,
-    padding: ms(12),
+    borderWidth: 1, borderColor: colors.dangerSoft,
+    padding: ms(14),
+    marginBottom: vs(14),
   },
-  errorText: { fontSize: ms(13), color: colors.danger, flex: 1 },
   retryBtn: {
+    alignSelf: 'flex-start',
     backgroundColor: colors.danger,
     borderRadius: radius.md,
-    paddingHorizontal: s(10),
-    paddingVertical: vs(5),
+    paddingHorizontal: s(10), paddingVertical: vs(4),
   },
-  retryText: { fontSize: ms(12), fontWeight: '700', color: colors.white },
+
+  // Empty state
+  emptyWrap: {
+    alignItems: 'center',
+    paddingVertical: vs(48),
+    gap: vs(10),
+  },
+  emptyIllu: { fontSize: ms(56), marginBottom: vs(4) },
+  emptyTitle: { letterSpacing: -0.3 },
+  emptySub: { maxWidth: s(240), lineHeight: ms(22) },
+  emptyResetBtn: {
+    borderRadius: radius.pill, overflow: 'hidden',
+    marginTop: vs(8),
+    ...shadow.sm, shadowColor: colors.premium,
+  },
+  emptyResetBtnInner: { paddingHorizontal: s(24), paddingVertical: vs(12) },
 });

@@ -111,7 +111,6 @@ export const WatchlistScreen: React.FC<Props> = () => {
         data={pagedEntries}
         keyExtractor={(e) => e.item.productId}
         contentContainerStyle={styles.content}
-        getItemLayout={(_, index) => ({ length: vs(200), offset: vs(200) * index, index })}
         onEndReached={loadMore}
         onEndReachedThreshold={0.4}
         ListFooterComponent={

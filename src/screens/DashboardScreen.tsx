@@ -4,6 +4,7 @@ import {
   Dimensions,
   Image,
   Linking,
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -11,8 +12,9 @@ import {
   View,
 } from 'react-native';
 import { Text } from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'react-native-linear-gradient';
+import { BlurView } from '@react-native-community/blur';
 import Animated, {
   FadeInDown,
   FadeInRight,
@@ -36,11 +38,14 @@ import { useProductStore } from '../stores/useProductStore';
 import { getUnlockedIdSet } from '../services/unlockService';
 import { isDemoPaymentMode } from '../services/paymentService';
 import { colors, gradients } from '../theme/colors';
-import { spacing, radius } from '../theme/spacing';
+import { spacing, radius, shadow, glowShadow } from '../theme/spacing';
 import { ms, s, vs } from '../theme/responsive';
 import { formatCurrency } from '../utils/formatCurrency';
+import { hapticLight } from '../utils/haptics';
 import { RecommendationBadge } from '../components/RecommendationBadge';
 import { DashboardSkeleton } from '../components/skeletons/DashboardSkeleton';
+import { AppText } from '../components/AppText';
+import { SparklineSvg } from '../components/SparklineSvg';
 import { DashboardStats, ScoredProduct } from '../types/product';
 import { MarketPulseItem, TrendingPost } from '../types/market';
 import { fetchMarketPulse, MARKET_PULSE_FALLBACK } from '../api/redditMarketApi';
@@ -76,31 +81,41 @@ const SCORE_DIMS = [
   { label: 'Risk', weight: 5, color: colors.premium },
 ];
 
-// ── Mini sparkline chart ───────────────────────────────────────────────────────
-const Sparkline: React.FC<{ bars: number[]; color: string }> = ({ bars, color }) => {
-  const max = Math.max(...bars);
+// ── Mini sparkline chart (smooth gradient line + glow dot) ─────────────────────
+const Sparkline: React.FC<{ bars: number[]; color: string }> = ({ bars, color }) => (
+  <SparklineSvg values={bars} color={color} width={ms(80)} height={ms(22)} />
+);
+
+// ── Animated pulse card wrapper — springs to scale 1.04 + full opacity when
+// active, settles to scale 1.0 + opacity 0.7 when inactive.
+const PulseCardAnimated: React.FC<{
+  isActive: boolean;
+  glowStyle: ReturnType<typeof useAnimatedStyle>;
+  children: React.ReactNode;
+  style?: any;
+}> = ({ isActive, glowStyle, children, style }) => {
+  const scale = useSharedValue(1);
+  const opacity = useSharedValue(1);
+
+  useEffect(() => {
+    scale.value = withSpring(isActive ? 1.04 : 1, { damping: 14, stiffness: 180 });
+    opacity.value = withTiming(isActive ? 1 : 0.7, { duration: 280 });
+  }, [isActive, scale, opacity]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+    opacity: opacity.value,
+  }));
+
   return (
-    <View style={sparkStyles.wrap}>
-      {bars.map((v, i) => (
-        <View
-          key={i}
-          style={[
-            sparkStyles.bar,
-            {
-              height: ms(22) * (v / max),
-              backgroundColor: i === bars.length - 1 ? color : color + '55',
-            },
-          ]}
-        />
-      ))}
-    </View>
+    <Animated.View style={[style, animatedStyle]}>
+      {isActive && (
+        <Animated.View style={[StyleSheet.absoluteFill, styles.pulseGlow, glowStyle]} />
+      )}
+      {children}
+    </Animated.View>
   );
 };
-
-const sparkStyles = StyleSheet.create({
-  wrap: { flexDirection: 'row', alignItems: 'flex-end', gap: s(3), height: ms(22) },
-  bar: { width: s(5), borderRadius: ms(2) },
-});
 
 // ── Count-up number ────────────────────────────────────────────────────────────
 const CountUp: React.FC<{ target: number; color: string }> = ({ target, color }) => {
@@ -196,6 +211,8 @@ export const DashboardScreen: React.FC<Props> = () => {
   const [trendingPosts, setTrendingPosts] = useState<TrendingPost[]>([]);
   const [trendingLoading, setTrendingLoading] = useState(false);
 
+  const insets = useSafeAreaInsets();
+
   // ── Animated live dot
   const liveDotAnim = useRef(new RNAnimated.Value(1)).current;
   useEffect(() => {
@@ -207,7 +224,16 @@ export const DashboardScreen: React.FC<Props> = () => {
     ).start();
   }, [liveDotAnim]);
 
-  // ── Orb float animations
+  // ── Scroll position (drives parallax, sticky header, AI section bars)
+  const scrollY = useSharedValue(0);
+  const aiSectionY = useSharedValue(0);
+  const scrollHandler = useAnimatedScrollHandler({
+    onScroll: (e) => {
+      scrollY.value = e.contentOffset.y;
+    },
+  });
+
+  // ── Orb float + parallax (orbs drift up at 0.4× scroll for depth)
   const orb1Y = useSharedValue(0);
   const orb2Y = useSharedValue(0);
   const orb3Y = useSharedValue(0);
@@ -230,9 +256,15 @@ export const DashboardScreen: React.FC<Props> = () => {
     );
   }, []);
 
-  const orb1Style = useAnimatedStyle(() => ({ transform: [{ translateY: orb1Y.value }] }));
-  const orb2Style = useAnimatedStyle(() => ({ transform: [{ translateY: orb2Y.value }] }));
-  const orb3Style = useAnimatedStyle(() => ({ transform: [{ translateY: orb3Y.value }] }));
+  const orb1Style = useAnimatedStyle(() => ({
+    transform: [{ translateY: orb1Y.value + scrollY.value * -0.45 }],
+  }));
+  const orb2Style = useAnimatedStyle(() => ({
+    transform: [{ translateY: orb2Y.value + scrollY.value * -0.3 }],
+  }));
+  const orb3Style = useAnimatedStyle(() => ({
+    transform: [{ translateY: orb3Y.value + scrollY.value * -0.2 }],
+  }));
 
   // ── Pulse card glow
   const glowOpacity = useSharedValue(0.4);
@@ -245,14 +277,33 @@ export const DashboardScreen: React.FC<Props> = () => {
   }, []);
   const glowStyle = useAnimatedStyle(() => ({ opacity: glowOpacity.value }));
 
-  // ── Scroll-driven bar animations
-  const scrollY = useSharedValue(0);
-  const aiSectionY = useSharedValue(0);
-  const scrollHandler = useAnimatedScrollHandler({
-    onScroll: (e) => {
-      scrollY.value = e.contentOffset.y;
-    },
-  });
+  // ── Credit card sheen — single diagonal sweep on mount, then again every 8s
+  const sheenX = useSharedValue(-1);
+  useEffect(() => {
+    sheenX.value = withRepeat(
+      withSequence(
+        withTiming(-1, { duration: 0 }),
+        withTiming(1, { duration: 1400 }),
+        withTiming(1, { duration: 6600 }),
+      ),
+      -1,
+      false,
+    );
+  }, []);
+  const sheenStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: interpolate(sheenX.value, [-1, 1], [-SCREEN_W * 0.6, SCREEN_W * 0.6]) }],
+    opacity: interpolate(sheenX.value, [-1, -0.8, 0, 0.8, 1], [0, 0.6, 0.9, 0.6, 0], Extrapolation.CLAMP),
+  }));
+
+  // ── Sticky compact header — fades in past 80px, fully visible at 140px
+  const stickyHeaderStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(scrollY.value, [80, 140], [0, 1], Extrapolation.CLAMP),
+    transform: [
+      {
+        translateY: interpolate(scrollY.value, [80, 140], [-8, 0], Extrapolation.CLAMP),
+      },
+    ],
+  }));
 
   // ── Data loading
   const buildStats = useCallback(async (prods: ScoredProduct[]) => {
@@ -334,6 +385,50 @@ export const DashboardScreen: React.FC<Props> = () => {
 
   return (
     <SafeAreaView style={styles.safe} edges={[]}>
+      {/* ── Sticky compact header (BlurView, fades in past 80px scroll) ── */}
+      <Animated.View
+        pointerEvents="box-none"
+        style={[
+          styles.stickyHeader,
+          { paddingTop: insets.top + ms(6) },
+          stickyHeaderStyle,
+        ]}
+      >
+        {Platform.OS === 'ios' ? (
+          <BlurView
+            blurType="dark"
+            blurAmount={22}
+            reducedTransparencyFallbackColor={colors.heroDark}
+            style={StyleSheet.absoluteFill}
+          />
+        ) : (
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.heroDark + 'EE' }]} />
+        )}
+        <View style={styles.stickyHeaderInner}>
+          <View style={styles.stickyHeaderLeft}>
+            <LinearGradient
+              colors={gradients.premium}
+              style={styles.stickyLogo}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <AppText variant="caption2" color="#fff" style={{ fontWeight: '900' }}>
+                TP
+              </AppText>
+            </LinearGradient>
+            <AppText variant="headline" color="#fff">
+              TrendPro
+            </AppText>
+          </View>
+          <View style={styles.stickyHeaderRight}>
+            <MaterialCommunityIcons name="diamond" size={ms(14)} color={colors.accent} />
+            <AppText variant="callout" tabular color="#fff" style={{ fontWeight: '700' }}>
+              {balance}
+            </AppText>
+          </View>
+        </View>
+      </Animated.View>
+
       <Animated.ScrollView
         onScroll={scrollHandler}
         scrollEventThrottle={16}
@@ -351,6 +446,32 @@ export const DashboardScreen: React.FC<Props> = () => {
             colors={[colors.heroDark, colors.heroMid, colors.heroLight]}
             style={StyleSheet.absoluteFill}
           />
+
+          {/* ── Floating gradient orbs (parallax + drift) ── */}
+          <Animated.View style={[styles.orb1, orb1Style]} pointerEvents="none">
+            <LinearGradient
+              colors={[colors.accent + 'AA', 'transparent']}
+              style={styles.orbInner}
+              start={{ x: 0.2, y: 0.2 }}
+              end={{ x: 0.9, y: 0.9 }}
+            />
+          </Animated.View>
+          <Animated.View style={[styles.orb2, orb2Style]} pointerEvents="none">
+            <LinearGradient
+              colors={[colors.premium + '99', 'transparent']}
+              style={styles.orbInner}
+              start={{ x: 0.5, y: 0.1 }}
+              end={{ x: 0.5, y: 1 }}
+            />
+          </Animated.View>
+          <Animated.View style={[styles.orb3, orb3Style]} pointerEvents="none">
+            <LinearGradient
+              colors={[colors.gold + '77', 'transparent']}
+              style={styles.orbInner}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            />
+          </Animated.View>
 
           {/* ── Top nav row ── */}
           <View style={styles.heroNav}>
@@ -394,26 +515,74 @@ export const DashboardScreen: React.FC<Props> = () => {
           </View>
 
           {/* ── Credit balance card ── */}
-          <TouchableOpacity onPress={() => navigation.navigate('BuyCredits')} activeOpacity={0.88} style={styles.creditCardWrap}>
-            <View style={styles.creditCard}>
-              <View style={styles.creditTop}>
-                <View>
-                  <Text style={styles.creditLabel}>AVAILABLE CREDITS</Text>
-                  <View style={styles.creditAmountRow}>
-                    <LinearGradient colors={gradients.premium} style={styles.creditDiamondWrap}>
-                      <MaterialCommunityIcons name="diamond" size={ms(16)} color="#fff" />
-                    </LinearGradient>
-                    <Text style={styles.creditAmount}>{balance}</Text>
-                    <Text style={styles.creditUnit}>credits</Text>
+          <TouchableOpacity
+            onPress={() => {
+              hapticLight();
+              navigation.navigate('BuyCredits');
+            }}
+            activeOpacity={0.88}
+            style={styles.creditCardWrap}
+          >
+            {/* Gradient hairline border (Apple Wallet treatment) */}
+            <LinearGradient
+              colors={[colors.accent + '88', colors.premium + '44', 'transparent']}
+              style={styles.creditCardBorder}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <View style={styles.creditCard}>
+                {/* Diagonal sheen sweep */}
+                <Animated.View style={[styles.creditSheen, sheenStyle]} pointerEvents="none">
+                  <LinearGradient
+                    colors={['transparent', 'rgba(255,255,255,0.12)', 'transparent']}
+                    style={StyleSheet.absoluteFill}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                  />
+                </Animated.View>
+
+                <View style={styles.creditTop}>
+                  <View style={{ flex: 1 }}>
+                    <AppText
+                      variant="caption2"
+                      uppercase
+                      color={colors.textCaption}
+                      style={{ marginBottom: vs(6) }}
+                    >
+                      Available Credits
+                    </AppText>
+                    <View style={styles.creditAmountRow}>
+                      <LinearGradient colors={gradients.premium} style={styles.creditDiamondWrap}>
+                        <MaterialCommunityIcons name="diamond" size={ms(16)} color="#fff" />
+                      </LinearGradient>
+                      <AppText variant="largeTitle" tabular color={colors.textPrimary}>
+                        {balance}
+                      </AppText>
+                      <AppText
+                        variant="callout"
+                        color={colors.textCaption}
+                        style={{ alignSelf: 'flex-end', marginBottom: vs(4) }}
+                      >
+                        credits
+                      </AppText>
+                    </View>
+                    <AppText
+                      variant="caption1"
+                      color={colors.textCaption}
+                      style={{ marginTop: vs(4) }}
+                    >
+                      1 credit = 1 USDC · USDC network
+                    </AppText>
                   </View>
-                  <Text style={styles.creditSub}>1 credit = 1 USDC · USDC network</Text>
+                  <LinearGradient colors={gradients.accent} style={styles.addBtn}>
+                    <MaterialCommunityIcons name="plus" size={ms(14)} color="#fff" />
+                    <AppText variant="callout" color="#fff" style={{ fontWeight: '700' }}>
+                      Add
+                    </AppText>
+                  </LinearGradient>
                 </View>
-                <LinearGradient colors={gradients.accent} style={styles.addBtn}>
-                  <MaterialCommunityIcons name="plus" size={ms(14)} color="#fff" />
-                  <Text style={styles.addBtnText}>Add</Text>
-                </LinearGradient>
               </View>
-            </View>
+            </LinearGradient>
           </TouchableOpacity>
         </View>
 
@@ -432,7 +601,17 @@ export const DashboardScreen: React.FC<Props> = () => {
                   <MaterialCommunityIcons name={m.icon} size={ms(17)} color={m.color} />
                 </View>
                 <CountUp target={m.value} color={m.color} />
-                <Text style={styles.metricLabel}>{m.label}</Text>
+                <AppText variant="caption2" uppercase color={colors.muted}>
+                  {m.label}
+                </AppText>
+                {m.value > 0 && (
+                  <View style={styles.metricTrend}>
+                    <MaterialCommunityIcons name="arrow-top-right" size={ms(10)} color={colors.success} />
+                    <AppText variant="caption2" color={colors.success}>
+                      Live
+                    </AppText>
+                  </View>
+                )}
               </View>
             </Animated.View>
           ))}
@@ -444,12 +623,16 @@ export const DashboardScreen: React.FC<Props> = () => {
         <Animated.View entering={FadeInDown.delay(100).springify().damping(14)}>
           <View style={styles.sectionHeader}>
             <View>
-              <Text style={styles.sectionTitle}>Market Pulse</Text>
-              <Text style={styles.sectionSub}>Category momentum scores</Text>
+              <AppText variant="title2">Market Pulse</AppText>
+              <AppText variant="footnote" color={colors.textCaption} style={{ marginTop: vs(2) }}>
+                Category momentum scores
+              </AppText>
             </View>
             <View style={styles.liveBadge}>
               <RNAnimated.View style={[styles.liveBadgeDot, { transform: [{ scale: liveDotAnim }] }]} />
-              <Text style={styles.liveBadgeText}>{pulseLoading ? 'LOADING' : 'LIVE'}</Text>
+              <AppText variant="caption2" uppercase color={colors.success}>
+                {pulseLoading ? 'Loading' : 'Live'}
+              </AppText>
             </View>
           </View>
 
@@ -464,19 +647,17 @@ export const DashboardScreen: React.FC<Props> = () => {
               return (
                 <TouchableOpacity
                   key={item.category}
-                  onPress={() => navigation.navigate('Discover')}
-                  activeOpacity={0.8}
+                  onPress={() => {
+                    hapticLight();
+                    navigation.navigate('Discover');
+                  }}
+                  activeOpacity={0.85}
                 >
-                  <Animated.View
-                    style={[
-                      styles.pulseCard,
-                      isActive && styles.pulseCardActive,
-                    ]}
+                  <PulseCardAnimated
+                    isActive={isActive}
+                    glowStyle={glowStyle}
+                    style={[styles.pulseCard, isActive && styles.pulseCardActive]}
                   >
-                    {isActive && (
-                      <Animated.View style={[StyleSheet.absoluteFill, styles.pulseGlow, glowStyle]} />
-                    )}
-
                     <View style={[styles.pulseCardInner, { backgroundColor: CARD_BG }]}>
                       {/* Emoji icon */}
                       <View style={[styles.pulseEmojiWrap, {
@@ -514,7 +695,7 @@ export const DashboardScreen: React.FC<Props> = () => {
                         </View>
                       )}
                     </View>
-                  </Animated.View>
+                  </PulseCardAnimated>
                 </TouchableOpacity>
               );
             })}
@@ -604,16 +785,23 @@ export const DashboardScreen: React.FC<Props> = () => {
           <Animated.View entering={FadeInDown.delay(160).springify().damping(14)} style={styles.sectionPad}>
             <View style={styles.sectionHeader}>
               <View>
-                <Text style={styles.sectionTitle}>Top Opportunity</Text>
-                <Text style={styles.sectionSub}>Highest winning score right now</Text>
+                <AppText variant="title2">Top Opportunity</AppText>
+                <AppText variant="footnote" color={colors.textCaption} style={{ marginTop: vs(2) }}>
+                  Highest winning score right now
+                </AppText>
               </View>
               <View style={styles.scorePill}>
-                <Text style={styles.scorePillText}>{topOpportunity.winningScore}/100</Text>
+                <AppText variant="callout" tabular color={colors.accent} style={{ fontWeight: '900' }}>
+                  {topOpportunity.winningScore}/100
+                </AppText>
               </View>
             </View>
 
             <TouchableOpacity
-              onPress={() => navigation.navigate('ProductDetail', { productId: topOpportunity.product.id })}
+              onPress={() => {
+                hapticLight();
+                navigation.navigate('ProductDetail', { productId: topOpportunity.product.id });
+              }}
               activeOpacity={0.88}
             >
               <View style={styles.topCard}>
@@ -686,12 +874,15 @@ export const DashboardScreen: React.FC<Props> = () => {
             QUICK ACTIONS
         ══════════════════════════════════════════════════════════════ */}
         <Animated.View entering={FadeInDown.delay(220).springify().damping(14)} style={styles.sectionPad}>
-          <Text style={styles.sectionTitle}>Quick Actions</Text>
+          <AppText variant="title2">Quick Actions</AppText>
           <View style={styles.actionsRow}>
             {QUICK_ACTIONS.map((a, i) => (
               <Animated.View key={a.label} entering={FadeInRight.delay(i * 60).springify().damping(14)}>
                 <TouchableOpacity
-                  onPress={() => navigation.navigate(a.screen)}
+                  onPress={() => {
+                    hapticLight();
+                    navigation.navigate(a.screen);
+                  }}
                   activeOpacity={0.8}
                   style={styles.actionBtn}
                 >
@@ -848,16 +1039,28 @@ const styles = StyleSheet.create({
   },
 
   // Credit card
-  creditCardWrap: { marginHorizontal: spacing.lg },
-  creditCard: {
+  creditCardWrap: {
+    marginHorizontal: spacing.lg,
     borderRadius: radius.xxl,
+    ...shadow.lg,
+    ...glowShadow(colors.accent),
+  },
+  creditCardBorder: {
+    borderRadius: radius.xxl,
+    padding: 1,
+  },
+  creditCard: {
+    borderRadius: radius.xxl - 1,
     padding: ms(18),
     backgroundColor: CARD_BG,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: ms(2) },
-    shadowOpacity: 0.06,
-    shadowRadius: ms(12),
-    elevation: 2,
+    overflow: 'hidden',
+  },
+  creditSheen: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    width: ms(140),
+    left: 0,
   },
   creditTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   creditLabel: { color: colors.textCaption, fontSize: ms(10), fontWeight: '700', letterSpacing: 1.2, marginBottom: vs(6) },
@@ -896,11 +1099,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: vs(4),
     backgroundColor: CARD_BG,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: ms(2) },
-    shadowOpacity: 0.06,
-    shadowRadius: ms(12),
-    elevation: 2,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.06)',
+    ...shadow.md,
   },
   metricIcon: {
     width: ms(34),
@@ -910,6 +1111,50 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   metricLabel: { fontSize: ms(10), color: colors.muted, fontWeight: '600', letterSpacing: 0.3 },
+  metricTrend: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: s(2),
+    marginTop: vs(2),
+  },
+
+  // ── Sticky compact header
+  stickyHeader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+    overflow: 'hidden',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(255,255,255,0.08)',
+  },
+  stickyHeaderInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    paddingBottom: vs(10),
+  },
+  stickyHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: s(8) },
+  stickyHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: s(6),
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    paddingHorizontal: s(10),
+    paddingVertical: vs(5),
+    borderRadius: radius.pill,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  stickyLogo: {
+    width: ms(28),
+    height: ms(28),
+    borderRadius: ms(9),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 
   // ── Section headers
   sectionPad: { paddingHorizontal: spacing.lg, marginTop: spacing.xl },
@@ -993,11 +1238,9 @@ const styles = StyleSheet.create({
     borderRadius: radius.xxl,
     overflow: 'hidden',
     backgroundColor: CARD_BG,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: ms(2) },
-    shadowOpacity: 0.06,
-    shadowRadius: ms(12),
-    elevation: 2,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.06)',
+    ...shadow.md,
   },
   topAccentStripe: { height: ms(3) },
   topCardHeader: {
@@ -1102,11 +1345,9 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     marginTop: spacing.sm,
     backgroundColor: CARD_BG,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: ms(2) },
-    shadowOpacity: 0.06,
-    shadowRadius: ms(12),
-    elevation: 2,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.06)',
+    ...shadow.md,
   },
   aiCardInner: { padding: ms(18) },
   aiHeader: {

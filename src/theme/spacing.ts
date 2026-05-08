@@ -22,6 +22,31 @@ export const radius = {
 };
 
 export const shadow = {
+  // ── iOS-tuned elevation system ────────────────────────────────────────────
+  // Use these on dark surfaces — opacity is bumped vs. the legacy `card`
+  // tokens because faint shadows disappear against dark backgrounds.
+  sm: {
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: ms(2) },
+    shadowOpacity: 0.12,
+    shadowRadius: ms(8),
+    elevation: 2,
+  },
+  md: {
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: ms(6) },
+    shadowOpacity: 0.18,
+    shadowRadius: ms(16),
+    elevation: 4,
+  },
+  lg: {
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: ms(10) },
+    shadowOpacity: 0.24,
+    shadowRadius: ms(24),
+    elevation: 8,
+  },
+
   // Navigation bar — soft downward glow (Figma: 0px 4px 24px rgba(0,0,0,0.08))
   nav: {
     shadowColor: '#000000',
@@ -55,6 +80,18 @@ export const shadow = {
     elevation: 8,
   },
 };
+
+/** Tinted accent glow — pass any hex/rgba color to make the surface "halo" in that hue.
+ * Useful for premium / live cards to draw the eye. */
+export function glowShadow(hexColor: string): ViewStyle {
+  return {
+    shadowColor: hexColor,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.45,
+    shadowRadius: ms(18),
+    elevation: 6,
+  };
+}
 
 /** Tinted CTA button shadow — pass the button's background hex color (e.g. colors.accent). */
 export function buttonShadow(hexColor: string): ViewStyle {

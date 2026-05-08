@@ -1,26 +1,40 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  StatusBar,
   StyleSheet,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Text } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import { LinearGradient } from 'react-native-linear-gradient';
+import Animated, {
+  FadeIn,
+  FadeInDown,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming,
+  interpolate,
+  Extrapolation,
+} from 'react-native-reanimated';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { AuthStackParamList } from '../../types/navigation';
 import { useAuthStore } from '../../stores/useAuthStore';
-import { colors } from '../../theme/colors';
-import { radius, spacing } from '../../theme/spacing';
+import { colors, gradients } from '../../theme/colors';
+import { radius, spacing, shadow } from '../../theme/spacing';
 import { ms, s, vs } from '../../theme/responsive';
+import { hapticLight, hapticMedium, hapticSuccess, hapticWarning } from '../../utils/haptics';
+import { AppText } from '../../components/AppText';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'SignUp'>;
 
@@ -38,9 +52,9 @@ const getPasswordStrength = (pwd: string): PasswordStrength => {
 };
 
 const STRENGTH_CONFIG: Record<PasswordStrength, { label: string; color: string; bars: number }> = {
-  weak: { label: 'Weak', color: colors.danger, bars: 1 },
-  fair: { label: 'Fair', color: colors.warning, bars: 2 },
-  strong: { label: 'Strong', color: colors.success, bars: 3 },
+  weak:   { label: 'Weak',   color: colors.danger,  bars: 1 },
+  fair:   { label: 'Fair',   color: colors.warning,  bars: 2 },
+  strong: { label: 'Strong', color: colors.success,  bars: 3 },
 };
 
 const schema = yup.object({
@@ -57,8 +71,8 @@ const schema = yup.object({
     .string()
     .required('Password is required')
     .min(8, 'Password must be at least 8 characters')
-    .matches(/[A-Za-z]/, 'Password must contain at least one letter')
-    .matches(/[0-9]/, 'Password must contain at least one number'),
+    .matches(/[A-Za-z]/, 'Must contain at least one letter')
+    .matches(/[0-9]/, 'Must contain at least one number'),
   confirmPassword: yup
     .string()
     .required('Please confirm your password')
@@ -67,13 +81,187 @@ const schema = yup.object({
 
 type FormData = yup.InferType<typeof schema>;
 
+// ── Floating label input ──────────────────────────────────────────────────────
+
+interface FloatingInputProps {
+  label: string;
+  value: string;
+  onChangeText: (v: string) => void;
+  onBlur: () => void;
+  onFocus?: () => void;
+  secureTextEntry?: boolean;
+  autoCapitalize?: 'none' | 'words' | 'sentences' | 'characters';
+  keyboardType?: 'default' | 'email-address';
+  returnKeyType?: 'next' | 'done';
+  onSubmitEditing?: () => void;
+  inputRef?: React.RefObject<TextInput>;
+  hasError?: boolean;
+  hasSuccess?: boolean;
+  rightSlot?: React.ReactNode;
+  clearOnChange?: () => void;
+}
+
+const FloatingInput: React.FC<FloatingInputProps> = ({
+  label, value, onChangeText, onBlur, onFocus, secureTextEntry,
+  autoCapitalize = 'none', keyboardType = 'default',
+  returnKeyType = 'done', onSubmitEditing, inputRef, hasError, hasSuccess, rightSlot, clearOnChange,
+}) => {
+  const [isFocused, setIsFocused] = useState(false);
+  const floatAnim = useSharedValue(value?.length > 0 ? 1 : 0);
+
+  const labelStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateY: interpolate(floatAnim.value, [0, 1], [0, -vs(22)], Extrapolation.CLAMP) },
+    ],
+    fontSize: interpolate(floatAnim.value, [0, 1], [ms(15), ms(11)], Extrapolation.CLAMP),
+  }));
+
+  const handleFocus = () => {
+    setIsFocused(true);
+    floatAnim.value = withTiming(1, { duration: 180 });
+    onFocus?.();
+  };
+
+  const handleBlur = () => {
+    setIsFocused(false);
+    if (!value?.length) floatAnim.value = withTiming(0, { duration: 180 });
+    onBlur();
+  };
+
+  const borderColor = hasError
+    ? colors.danger
+    : hasSuccess
+      ? colors.success
+      : isFocused
+        ? colors.accent
+        : 'rgba(255,255,255,0.12)';
+
+  return (
+    <View style={[floatStyles.wrap, { borderColor }]}>
+      <Animated.Text style={[floatStyles.label, labelStyle, {
+        color: isFocused ? colors.accent : 'rgba(255,255,255,0.4)',
+      }]}>{label}</Animated.Text>
+      <TextInput
+        ref={inputRef}
+        style={floatStyles.input}
+        value={value}
+        onChangeText={(t) => { onChangeText(t); clearOnChange?.(); }}
+        onFocus={handleFocus}
+        onBlur={handleBlur}
+        secureTextEntry={secureTextEntry}
+        autoCapitalize={autoCapitalize}
+        keyboardType={keyboardType}
+        returnKeyType={returnKeyType}
+        onSubmitEditing={onSubmitEditing}
+        placeholderTextColor="transparent"
+        autoCorrect={false}
+        spellCheck={false}
+      />
+      {rightSlot && <View style={floatStyles.rightSlot}>{rightSlot}</View>}
+    </View>
+  );
+};
+
+const floatStyles = StyleSheet.create({
+  wrap: {
+    height: vs(60),
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    paddingHorizontal: s(16),
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  label: {
+    position: 'absolute',
+    left: s(16),
+    top: '50%',
+    marginTop: -ms(8),
+    fontWeight: '500',
+    pointerEvents: 'none',
+  } as any,
+  input: {
+    color: colors.white,
+    fontSize: ms(15),
+    paddingTop: vs(12),
+    paddingBottom: 0,
+    paddingRight: s(40),
+  },
+  rightSlot: {
+    position: 'absolute',
+    right: s(14),
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
+  },
+});
+
+// ── Gradient CTA ─────────────────────────────────────────────────────────────
+
+interface GradientCTAProps {
+  label: string;
+  onPress: () => void;
+  loading?: boolean;
+  disabled?: boolean;
+}
+
+const GradientCTA: React.FC<GradientCTAProps> = ({ label, onPress, loading, disabled }) => {
+  const contentOpacity = useSharedValue(1);
+
+  useEffect(() => {
+    contentOpacity.value = withTiming(loading ? 0 : 1, { duration: 180 });
+  }, [loading]);
+
+  const contentStyle = useAnimatedStyle(() => ({ opacity: contentOpacity.value }));
+  const spinnerStyle = useAnimatedStyle(() => ({ opacity: 1 - contentOpacity.value }));
+
+  return (
+    <TouchableOpacity
+      onPress={() => { hapticMedium(); onPress(); }}
+      activeOpacity={0.88}
+      disabled={disabled || loading}
+      style={[ctaStyles.outer, (disabled && !loading) && ctaStyles.outerDisabled]}
+    >
+      {disabled && !loading ? (
+        <View style={ctaStyles.inner}>
+          <Animated.Text style={[ctaStyles.label, { color: colors.textCaption }]}>{label}</Animated.Text>
+        </View>
+      ) : (
+        <LinearGradient
+          colors={gradients.premium}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={ctaStyles.inner}
+        >
+          <Animated.Text style={[ctaStyles.label, contentStyle]}>{label}</Animated.Text>
+          <Animated.View style={[ctaStyles.spinnerWrap, spinnerStyle]} pointerEvents="none">
+            <ActivityIndicator color={colors.white} size="small" />
+          </Animated.View>
+        </LinearGradient>
+      )}
+    </TouchableOpacity>
+  );
+};
+
+const ctaStyles = StyleSheet.create({
+  outer: {
+    borderRadius: radius.pill,
+    overflow: 'hidden',
+    height: vs(56),
+    ...shadow.md,
+    shadowColor: colors.premium,
+  },
+  outerDisabled: { opacity: 0.45 },
+  inner: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  label: { color: colors.white, fontSize: ms(16), fontWeight: '700', letterSpacing: 0.3 },
+  spinnerWrap: { position: 'absolute' },
+});
+
+// ── Main screen ───────────────────────────────────────────────────────────────
+
 export const SignupScreen: React.FC<Props> = ({ navigation }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-  const [nameFocused, setNameFocused] = useState(false);
-  const [emailFocused, setEmailFocused] = useState(false);
-  const [passwordFocused, setPasswordFocused] = useState(false);
-  const [confirmFocused, setConfirmFocused] = useState(false);
   const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
   const [confirmEmailMsg, setConfirmEmailMsg] = useState<string | null>(null);
@@ -83,6 +271,31 @@ export const SignupScreen: React.FC<Props> = ({ navigation }) => {
   const confirmRef = useRef<TextInput>(null);
   const signUp = useAuthStore((s) => s.signUp);
 
+  // ── Orb float animations ──────────────────────────────────────────────────
+  const orb1Y = useSharedValue(0);
+  const orb2Y = useSharedValue(0);
+  const orb3Y = useSharedValue(0);
+
+  useEffect(() => {
+    orb1Y.value = withRepeat(withSequence(
+      withTiming(-16, { duration: 4200 }),
+      withTiming(0, { duration: 4200 }),
+    ), -1, false);
+    orb2Y.value = withRepeat(withSequence(
+      withTiming(12, { duration: 3600 }),
+      withTiming(-8, { duration: 3600 }),
+    ), -1, false);
+    orb3Y.value = withRepeat(withSequence(
+      withTiming(-8, { duration: 5000 }),
+      withTiming(10, { duration: 5000 }),
+    ), -1, false);
+  }, []);
+
+  const orb1Style = useAnimatedStyle(() => ({ transform: [{ translateY: orb1Y.value }] }));
+  const orb2Style = useAnimatedStyle(() => ({ transform: [{ translateY: orb2Y.value }] }));
+  const orb3Style = useAnimatedStyle(() => ({ transform: [{ translateY: orb3Y.value }] }));
+
+  // ── Form ──────────────────────────────────────────────────────────────────
   const {
     control,
     handleSubmit,
@@ -90,7 +303,7 @@ export const SignupScreen: React.FC<Props> = ({ navigation }) => {
     formState: { errors, isValid },
   } = useForm<FormData>({
     resolver: yupResolver(schema),
-    mode: 'onChange',
+    mode: 'onTouched',
   });
 
   const watchedPassword = watch('password', '');
@@ -100,77 +313,143 @@ export const SignupScreen: React.FC<Props> = ({ navigation }) => {
   const passwordsMatch =
     watchedConfirm.length > 0 && watchedPassword === watchedConfirm && !errors.confirmPassword;
 
+  const clearError = () => setServerError(null);
+
   const onSubmit = async (data: FormData) => {
     setServerError(null);
     setConfirmEmailMsg(null);
     setLoading(true);
     const { error, needsEmailConfirmation } = await signUp(data.email, data.password, data.name);
     setLoading(false);
-    if (error) { setServerError(error); return; }
+    if (error) { setServerError(error); hapticWarning(); return; }
     if (needsEmailConfirmation) {
+      hapticSuccess();
       setConfirmEmailMsg(
         `We sent a confirmation link to ${data.email.trim()}. Tap it, then come back and sign in.`,
       );
     }
   };
 
+  const handleAppleSignIn = () => {
+    hapticMedium();
+    if (__DEV__) console.log('[Auth] Apple Sign Up — stub');
+  };
+
+  const handleGoogleSignIn = () => {
+    hapticLight();
+    if (__DEV__) console.log('[Auth] Google Sign Up — stub');
+  };
+
   return (
-    <View style={styles.container}>
+    <View style={styles.root}>
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+
+      {/* ── Dark gradient background ── */}
+      <LinearGradient
+        colors={['#0A0A0A', '#141414', '#1A1A1A']}
+        style={StyleSheet.absoluteFill}
+      />
+
+      {/* ── Floating orbs ── */}
+      <Animated.View style={[styles.orb1, orb1Style]} pointerEvents="none">
+        <LinearGradient colors={['rgba(192,139,48,0.25)', 'transparent']} style={{ flex: 1 }} />
+      </Animated.View>
+      <Animated.View style={[styles.orb2, orb2Style]} pointerEvents="none">
+        <LinearGradient colors={['rgba(46,125,90,0.16)', 'transparent']} style={{ flex: 1 }} />
+      </Animated.View>
+      <Animated.View style={[styles.orb3, orb3Style]} pointerEvents="none">
+        <LinearGradient colors={['rgba(192,139,48,0.12)', 'transparent']} style={{ flex: 1 }} />
+      </Animated.View>
+
       <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.keyboardView}
+          style={styles.kav}
         >
           <ScrollView
             contentContainerStyle={styles.scroll}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
-            {/* Heading */}
-            <Animated.View entering={FadeInDown.delay(60).springify()} style={styles.heading}>
-              <Text style={styles.headingTitle}>Create account</Text>
-              <Text style={styles.headingSubtitle}>Start finding winning products today</Text>
+            {/* ── Hero copy ── */}
+            <Animated.View entering={FadeInDown.delay(60).springify()} style={styles.heroSection}>
+              {/* Free credits badge */}
+              <View style={styles.freeBadge}>
+                <MaterialCommunityIcons name="gift-outline" size={ms(13)} color={colors.accent} />
+                <AppText variant="caption2" color={colors.accent} uppercase style={styles.freeBadgeText}>
+                  2 free credits on sign up — no card needed
+                </AppText>
+              </View>
+              <AppText variant="largeTitle" color={colors.white} style={styles.heroTitle}>
+                Create your edge
+              </AppText>
+              <AppText variant="body" color="rgba(255,255,255,0.45)" style={styles.heroSub}>
+                Find winning products 30 days before your competition.
+              </AppText>
             </Animated.View>
 
-            {/* Free credits badge */}
-            <Animated.View entering={FadeInDown.delay(100).springify()} style={styles.creditsBadge}>
-              <Text style={styles.creditsBadgeText}>
-                🎁  2 free credits on sign up — no card needed
-              </Text>
+            {/* ── Social auth (Apple first, then Google) ── */}
+            <Animated.View entering={FadeInDown.delay(140).springify()} style={styles.socialSection}>
+              {/* Sign up with Apple */}
+              <TouchableOpacity
+                onPress={handleAppleSignIn}
+                activeOpacity={0.88}
+                style={styles.appleBtn}
+              >
+                <MaterialCommunityIcons name="apple" size={ms(20)} color="#FFFFFF" />
+                <AppText variant="callout" color="#FFFFFF" style={styles.appleBtnText}>
+                  Continue with Apple
+                </AppText>
+              </TouchableOpacity>
+
+              {/* Sign up with Google */}
+              <TouchableOpacity
+                onPress={handleGoogleSignIn}
+                activeOpacity={0.88}
+                style={styles.googleBtn}
+              >
+                <View style={styles.googleG}>
+                  <AppText variant="callout" style={styles.googleGText}>G</AppText>
+                </View>
+                <AppText variant="callout" color={colors.textPrimary} style={styles.googleBtnText}>
+                  Continue with Google
+                </AppText>
+              </TouchableOpacity>
             </Animated.View>
 
-            {/* Form */}
-            <Animated.View entering={FadeInDown.delay(160).springify()}>
+            {/* ── Divider ── */}
+            <Animated.View entering={FadeInDown.delay(200).springify()} style={styles.dividerRow}>
+              <View style={styles.dividerLine} />
+              <AppText variant="caption2" color="rgba(255,255,255,0.3)" style={styles.dividerText}>
+                or sign up with email
+              </AppText>
+              <View style={styles.dividerLine} />
+            </Animated.View>
+
+            {/* ── Email form ── */}
+            <Animated.View entering={FadeInDown.delay(260).springify()} style={styles.formCard}>
 
               {/* Full name */}
               <Controller
                 control={control}
                 name="name"
                 render={({ field: { onChange, onBlur, value } }) => (
-                  <View style={styles.field}>
-                    <Text style={styles.label}>Full Name</Text>
-                    <View
-                      style={[
-                        styles.inputRow,
-                        nameFocused && styles.inputRowFocused,
-                        errors.name && styles.inputRowError,
-                      ]}
-                    >
-                      <TextInput
-                        style={styles.input}
-                        placeholder="Jane Smith"
-                        placeholderTextColor={colors.textCaption}
-                        value={value}
-                        onChangeText={onChange}
-                        onBlur={() => { onBlur(); setNameFocused(false); }}
-                        onFocus={() => setNameFocused(true)}
-                        autoCapitalize="words"
-                        returnKeyType="next"
-                        onSubmitEditing={() => emailRef.current?.focus()}
-                      />
-                    </View>
+                  <View style={styles.fieldWrap}>
+                    <FloatingInput
+                      label="Full name"
+                      value={value ?? ''}
+                      onChangeText={onChange}
+                      onBlur={onBlur}
+                      autoCapitalize="words"
+                      keyboardType="default"
+                      returnKeyType="next"
+                      onSubmitEditing={() => emailRef.current?.focus()}
+                      hasError={!!errors.name}
+                    />
                     {errors.name && (
-                      <Text style={styles.fieldError}>{errors.name.message}</Text>
+                      <AppText variant="footnote" color={colors.danger} style={styles.fieldErr}>
+                        {errors.name.message}
+                      </AppText>
                     )}
                   </View>
                 )}
@@ -181,32 +460,24 @@ export const SignupScreen: React.FC<Props> = ({ navigation }) => {
                 control={control}
                 name="email"
                 render={({ field: { onChange, onBlur, value } }) => (
-                  <View style={styles.field}>
-                    <Text style={styles.label}>Email</Text>
-                    <View
-                      style={[
-                        styles.inputRow,
-                        emailFocused && styles.inputRowFocused,
-                        errors.email && styles.inputRowError,
-                      ]}
-                    >
-                      <TextInput
-                        ref={emailRef}
-                        style={styles.input}
-                        placeholder="you@example.com"
-                        placeholderTextColor={colors.textCaption}
-                        value={value}
-                        onChangeText={onChange}
-                        onBlur={() => { onBlur(); setEmailFocused(false); }}
-                        onFocus={() => setEmailFocused(true)}
-                        autoCapitalize="none"
-                        keyboardType="email-address"
-                        returnKeyType="next"
-                        onSubmitEditing={() => passwordRef.current?.focus()}
-                      />
-                    </View>
+                  <View style={styles.fieldWrap}>
+                    <FloatingInput
+                      label="Email address"
+                      value={value ?? ''}
+                      onChangeText={onChange}
+                      onBlur={onBlur}
+                      clearOnChange={clearError}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      returnKeyType="next"
+                      inputRef={emailRef}
+                      onSubmitEditing={() => passwordRef.current?.focus()}
+                      hasError={!!errors.email}
+                    />
                     {errors.email && (
-                      <Text style={styles.fieldError}>{errors.email.message}</Text>
+                      <AppText variant="footnote" color={colors.danger} style={styles.fieldErr}>
+                        {errors.email.message}
+                      </AppText>
                     )}
                   </View>
                 )}
@@ -217,39 +488,36 @@ export const SignupScreen: React.FC<Props> = ({ navigation }) => {
                 control={control}
                 name="password"
                 render={({ field: { onChange, onBlur, value } }) => (
-                  <View style={styles.field}>
-                    <Text style={styles.label}>Password</Text>
-                    <View
-                      style={[
-                        styles.inputRow,
-                        passwordFocused && styles.inputRowFocused,
-                        errors.password && styles.inputRowError,
-                      ]}
-                    >
-                      <TextInput
-                        ref={passwordRef}
-                        style={styles.input}
-                        placeholder="Min. 8 characters"
-                        placeholderTextColor={colors.textCaption}
-                        value={value}
-                        onChangeText={onChange}
-                        onBlur={() => { onBlur(); setPasswordFocused(false); }}
-                        onFocus={() => setPasswordFocused(true)}
-                        secureTextEntry={!showPassword}
-                        returnKeyType="next"
-                        onSubmitEditing={() => confirmRef.current?.focus()}
-                      />
-                      <TouchableOpacity
-                        onPress={() => setShowPassword((v) => !v)}
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                        style={styles.eyeBtn}
-                      >
-                        <Text style={styles.eyeText}>{showPassword ? 'HIDE' : 'SHOW'}</Text>
-                      </TouchableOpacity>
-                    </View>
+                  <View style={styles.fieldWrap}>
+                    <FloatingInput
+                      label="Password"
+                      value={value ?? ''}
+                      onChangeText={onChange}
+                      onBlur={onBlur}
+                      secureTextEntry={!showPassword}
+                      inputRef={passwordRef}
+                      returnKeyType="next"
+                      onSubmitEditing={() => confirmRef.current?.focus()}
+                      hasError={!!errors.password}
+                      rightSlot={
+                        <TouchableOpacity
+                          onPress={() => { hapticLight(); setShowPassword((v) => !v); }}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        >
+                          <MaterialCommunityIcons
+                            name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                            size={ms(18)}
+                            color="rgba(255,255,255,0.4)"
+                          />
+                        </TouchableOpacity>
+                      }
+                    />
                     {errors.password && (
-                      <Text style={styles.fieldError}>{errors.password.message}</Text>
+                      <AppText variant="footnote" color={colors.danger} style={styles.fieldErr}>
+                        {errors.password.message}
+                      </AppText>
                     )}
+                    {/* Password strength bars */}
                     {strengthConfig && !errors.password && (
                       <View style={styles.strengthWrap}>
                         <View style={styles.strengthBars}>
@@ -258,19 +526,14 @@ export const SignupScreen: React.FC<Props> = ({ navigation }) => {
                               key={bar}
                               style={[
                                 styles.strengthBar,
-                                {
-                                  backgroundColor:
-                                    bar <= strengthConfig.bars
-                                      ? strengthConfig.color
-                                      : colors.divider,
-                                },
+                                { backgroundColor: bar <= strengthConfig.bars ? strengthConfig.color : 'rgba(255,255,255,0.12)' },
                               ]}
                             />
                           ))}
                         </View>
-                        <Text style={[styles.strengthLabel, { color: strengthConfig.color }]}>
+                        <AppText variant="caption2" color={strengthConfig.color}>
                           {strengthConfig.label}
-                        </Text>
+                        </AppText>
                       </View>
                     )}
                   </View>
@@ -282,42 +545,40 @@ export const SignupScreen: React.FC<Props> = ({ navigation }) => {
                 control={control}
                 name="confirmPassword"
                 render={({ field: { onChange, onBlur, value } }) => (
-                  <View style={styles.field}>
-                    <Text style={styles.label}>Confirm Password</Text>
-                    <View
-                      style={[
-                        styles.inputRow,
-                        confirmFocused && styles.inputRowFocused,
-                        errors.confirmPassword && styles.inputRowError,
-                        passwordsMatch && styles.inputRowSuccess,
-                      ]}
-                    >
-                      <TextInput
-                        ref={confirmRef}
-                        style={styles.input}
-                        placeholder="Re-enter password"
-                        placeholderTextColor={colors.textCaption}
-                        value={value}
-                        onChangeText={onChange}
-                        onBlur={() => { onBlur(); setConfirmFocused(false); }}
-                        onFocus={() => setConfirmFocused(true)}
-                        secureTextEntry={!showConfirm}
-                        returnKeyType="done"
-                        onSubmitEditing={handleSubmit(onSubmit)}
-                      />
-                      <TouchableOpacity
-                        onPress={() => setShowConfirm((v) => !v)}
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                        style={styles.eyeBtn}
-                      >
-                        <Text style={styles.eyeText}>{showConfirm ? 'HIDE' : 'SHOW'}</Text>
-                      </TouchableOpacity>
-                    </View>
+                  <View style={styles.fieldWrap}>
+                    <FloatingInput
+                      label="Confirm password"
+                      value={value ?? ''}
+                      onChangeText={onChange}
+                      onBlur={onBlur}
+                      secureTextEntry={!showConfirm}
+                      inputRef={confirmRef}
+                      returnKeyType="done"
+                      onSubmitEditing={handleSubmit(onSubmit)}
+                      hasError={!!errors.confirmPassword}
+                      hasSuccess={passwordsMatch}
+                      rightSlot={
+                        <TouchableOpacity
+                          onPress={() => { hapticLight(); setShowConfirm((v) => !v); }}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        >
+                          <MaterialCommunityIcons
+                            name={showConfirm ? 'eye-off-outline' : 'eye-outline'}
+                            size={ms(18)}
+                            color="rgba(255,255,255,0.4)"
+                          />
+                        </TouchableOpacity>
+                      }
+                    />
                     {errors.confirmPassword && (
-                      <Text style={styles.fieldError}>{errors.confirmPassword.message}</Text>
+                      <AppText variant="footnote" color={colors.danger} style={styles.fieldErr}>
+                        {errors.confirmPassword.message}
+                      </AppText>
                     )}
                     {passwordsMatch && (
-                      <Text style={styles.successText}>✓ Passwords match</Text>
+                      <AppText variant="footnote" color={colors.success} style={styles.fieldErr}>
+                        ✓ Passwords match
+                      </AppText>
                     )}
                   </View>
                 )}
@@ -325,67 +586,53 @@ export const SignupScreen: React.FC<Props> = ({ navigation }) => {
 
               {/* Server error banner */}
               {serverError && (
-                <View style={styles.errorBanner}>
-                  <Text style={styles.errorBannerText}>⚠  {serverError}</Text>
-                </View>
+                <Animated.View entering={FadeIn.duration(200)} style={styles.errorBanner}>
+                  <MaterialCommunityIcons name="alert-circle-outline" size={ms(15)} color={colors.danger} />
+                  <AppText variant="footnote" color={colors.danger} style={styles.errorBannerText}>
+                    {serverError}
+                  </AppText>
+                </Animated.View>
               )}
 
-              {/* Email confirmation banner */}
+              {/* Email confirmation success banner */}
               {confirmEmailMsg && (
-                <View style={styles.confirmBanner}>
-                  <Text style={styles.confirmBannerTitle}>📬 Check your inbox</Text>
-                  <Text style={styles.confirmBannerText}>{confirmEmailMsg}</Text>
-                </View>
+                <Animated.View entering={FadeIn.duration(200)} style={styles.confirmBanner}>
+                  <MaterialCommunityIcons name="email-check-outline" size={ms(15)} color={colors.success} />
+                  <View style={styles.confirmBannerContent}>
+                    <AppText variant="caption2" color={colors.success} uppercase style={styles.confirmBannerTitle}>
+                      Check your inbox
+                    </AppText>
+                    <AppText variant="footnote" color={colors.success} style={styles.confirmBannerText}>
+                      {confirmEmailMsg}
+                    </AppText>
+                  </View>
+                </Animated.View>
               )}
 
               {/* CTA */}
-              <TouchableOpacity
-                onPress={handleSubmit(onSubmit)}
-                activeOpacity={0.85}
-                style={[
-                  styles.ctaBtn,
-                  (!isValid || loading) && styles.ctaDisabled,
-                ]}
-                disabled={!isValid || loading}
-              >
-                {loading ? (
-                  <ActivityIndicator color={colors.white} size="small" />
-                ) : (
-                  <Text style={styles.ctaLabel}>Create Account</Text>
-                )}
-              </TouchableOpacity>
-
-              {/* Divider */}
-              <View style={styles.divider}>
-                <View style={styles.dividerLine} />
-                <Text style={styles.dividerLabel}>OR CONTINUE WITH</Text>
-                <View style={styles.dividerLine} />
+              <View style={styles.ctaWrap}>
+                <GradientCTA
+                  label="Create Account"
+                  onPress={handleSubmit(onSubmit)}
+                  loading={loading}
+                  disabled={!isValid}
+                />
               </View>
+            </Animated.View>
 
-              {/* Social */}
-              <View style={styles.socialRow}>
-                <TouchableOpacity style={styles.socialBtn} activeOpacity={0.75}>
-                  <Text style={styles.socialBtnText}>G  Google</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.socialBtn} activeOpacity={0.75}>
-                  <Text style={styles.socialBtnText}>  Apple</Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Switch to login */}
-              <TouchableOpacity
-                onPress={() => navigation.navigate('Login')}
-                style={styles.switchRow}
-                hitSlop={{ top: 8, bottom: 8 }}
-              >
-                <Text style={styles.switchText}>Already have an account? </Text>
-                <Text style={styles.switchLink}>Sign in</Text>
+            {/* ── Switch to login ── */}
+            <Animated.View entering={FadeInDown.delay(320).springify()} style={styles.switchRow}>
+              <AppText variant="subhead" color="rgba(255,255,255,0.4)">Already have an account? </AppText>
+              <TouchableOpacity onPress={() => { hapticLight(); navigation.navigate('Login'); }}>
+                <AppText variant="subhead" color={colors.accent} style={styles.switchLink}>
+                  Sign in
+                </AppText>
               </TouchableOpacity>
             </Animated.View>
 
-            <Text style={styles.legal}>
+            <AppText variant="caption1" color="rgba(255,255,255,0.2)" center style={styles.legal}>
               By creating an account you agree to our Terms of Service and Privacy Policy
-            </Text>
+            </AppText>
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
@@ -394,215 +641,117 @@ export const SignupScreen: React.FC<Props> = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+  root: { flex: 1 },
   safe: { flex: 1 },
-  keyboardView: { flex: 1 },
+  kav: { flex: 1 },
+  scroll: { flexGrow: 1, paddingHorizontal: s(24), paddingBottom: vs(32) },
 
-  scroll: {
-    flexGrow: 1,
-    paddingHorizontal: spacing.page,
-    paddingBottom: vs(32),
+  // Orbs
+  orb1: {
+    position: 'absolute', width: ms(320), height: ms(320), borderRadius: ms(160),
+    top: -ms(100), right: -ms(80), overflow: 'hidden',
   },
-
-  heading: {
-    paddingTop: vs(40),
-    paddingBottom: vs(20),
+  orb2: {
+    position: 'absolute', width: ms(260), height: ms(260), borderRadius: ms(130),
+    top: ms(160), left: -ms(100), overflow: 'hidden',
   },
-  headingTitle: {
-    fontSize: ms(34),
-    fontWeight: '800',
-    color: colors.textPrimary,
-    letterSpacing: -0.6,
-    marginBottom: vs(6),
-  },
-  headingSubtitle: {
-    fontSize: ms(15),
-    fontWeight: '400',
-    color: colors.textCaption,
+  orb3: {
+    position: 'absolute', width: ms(180), height: ms(180), borderRadius: ms(90),
+    bottom: ms(100), right: ms(40), overflow: 'hidden',
   },
 
-  creditsBadge: {
-    backgroundColor: colors.accentSubtle,
-    borderRadius: radius.lg,
-    paddingVertical: vs(10),
-    paddingHorizontal: s(14),
+  // Hero
+  heroSection: { paddingTop: vs(36), paddingBottom: vs(28) },
+  freeBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: ms(5),
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(192,139,48,0.15)',
+    borderRadius: radius.pill, borderWidth: 1, borderColor: 'rgba(192,139,48,0.3)',
+    paddingHorizontal: s(10), paddingVertical: vs(4),
+    marginBottom: vs(14),
+  },
+  freeBadgeText: { letterSpacing: ms(0.4) },
+  heroTitle: { marginBottom: vs(8) },
+  heroSub: { lineHeight: ms(24) },
+
+  // Social
+  socialSection: { gap: vs(10), marginBottom: vs(20) },
+  appleBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: s(10),
+    height: vs(54), borderRadius: radius.pill,
+    backgroundColor: '#000000',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)',
+    ...shadow.sm,
+  },
+  appleBtnText: { fontWeight: '600' },
+  googleBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: s(10),
+    height: vs(54), borderRadius: radius.pill,
+    backgroundColor: '#FFFFFF',
+    ...shadow.sm,
+  },
+  googleG: {
+    width: ms(22), height: ms(22), borderRadius: ms(11),
+    alignItems: 'center', justifyContent: 'center',
+  },
+  googleGText: { color: '#4285F4', fontSize: ms(14), fontWeight: '700' },
+  googleBtnText: { fontWeight: '600' },
+
+  // Divider
+  dividerRow: {
+    flexDirection: 'row', alignItems: 'center', gap: s(10),
+    marginBottom: vs(20),
+  },
+  dividerLine: { flex: 1, height: 1, backgroundColor: 'rgba(255,255,255,0.1)' },
+  dividerText: {},
+
+  // Form card
+  formCard: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    padding: s(20),
+    gap: vs(4),
     marginBottom: vs(24),
   },
-  creditsBadgeText: {
-    color: colors.accentHover,
-    fontSize: ms(13),
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-
-  field: { marginBottom: vs(16) },
-  label: {
-    color: colors.textCaption,
-    fontSize: ms(11),
-    fontWeight: '700',
-    letterSpacing: ms(0.8),
-    textTransform: 'uppercase',
-    marginBottom: vs(8),
-  },
-
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surfaceVariant,
-    borderRadius: radius.md,
-    paddingHorizontal: s(16),
-    height: vs(52),
-    borderWidth: 1,
-    borderColor: 'transparent',
-  },
-  inputRowFocused: { borderColor: colors.accent },
-  inputRowError: { borderColor: colors.danger },
-  inputRowSuccess: { borderColor: colors.success },
-  input: {
-    flex: 1,
-    color: colors.textPrimary,
-    fontSize: ms(15),
-    fontWeight: '400',
-    paddingVertical: 0,
-  },
-  eyeBtn: { paddingLeft: s(10) },
-  eyeText: {
-    color: colors.textCaption,
-    fontSize: ms(10),
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-
-  fieldError: {
-    color: colors.danger,
-    fontSize: ms(12),
-    fontWeight: '500',
-    marginTop: vs(5),
-  },
-  successText: {
-    color: colors.success,
-    fontSize: ms(12),
-    fontWeight: '600',
-    marginTop: vs(5),
-  },
+  fieldWrap: { marginBottom: vs(4) },
+  fieldErr: { marginTop: vs(4), marginLeft: s(4) },
 
   strengthWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: 'row', alignItems: 'center', gap: s(8),
     marginTop: vs(8),
-    gap: s(8),
   },
   strengthBars: { flexDirection: 'row', gap: s(4) },
-  strengthBar: {
-    width: s(28),
-    height: vs(4),
-    borderRadius: ms(2),
-  },
-  strengthLabel: {
-    fontSize: ms(11),
-    fontWeight: '700',
-    letterSpacing: 0.3,
-  },
+  strengthBar: { width: s(28), height: vs(4), borderRadius: ms(2) },
 
   errorBanner: {
-    backgroundColor: colors.dangerSubtle,
-    borderRadius: radius.md,
-    paddingVertical: vs(12),
-    paddingHorizontal: s(14),
-    marginBottom: vs(14),
-  },
-  errorBannerText: {
-    color: colors.danger,
-    fontSize: ms(13),
-    fontWeight: '500',
-    lineHeight: ms(18),
-  },
-
-  confirmBanner: {
-    backgroundColor: colors.successSubtle,
-    borderRadius: radius.md,
-    paddingVertical: vs(12),
-    paddingHorizontal: s(14),
-    marginBottom: vs(14),
-  },
-  confirmBannerTitle: {
-    color: colors.success,
-    fontSize: ms(13),
-    fontWeight: '700',
+    flexDirection: 'row', alignItems: 'flex-start', gap: s(8),
+    backgroundColor: 'rgba(192,57,43,0.15)',
+    borderRadius: radius.md, borderWidth: 1, borderColor: 'rgba(192,57,43,0.3)',
+    paddingVertical: vs(10), paddingHorizontal: s(12),
     marginBottom: vs(4),
   },
-  confirmBannerText: {
-    color: colors.success,
-    fontSize: ms(12),
-    lineHeight: ms(17),
-  },
+  errorBannerText: { flex: 1, lineHeight: ms(18) },
 
-  ctaBtn: {
-    height: vs(54),
-    borderRadius: radius.pill,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: vs(4),
-    marginBottom: vs(24),
+  confirmBanner: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: s(8),
+    backgroundColor: 'rgba(46,125,90,0.15)',
+    borderRadius: radius.md, borderWidth: 1, borderColor: 'rgba(46,125,90,0.3)',
+    paddingVertical: vs(10), paddingHorizontal: s(12),
+    marginBottom: vs(4),
   },
-  ctaDisabled: { backgroundColor: colors.divider },
-  ctaLabel: {
-    color: colors.white,
-    fontSize: ms(15),
-    fontWeight: '700',
-    letterSpacing: 0.4,
-  },
+  confirmBannerContent: { flex: 1, gap: vs(2) },
+  confirmBannerTitle: { letterSpacing: ms(0.5) },
+  confirmBannerText: { lineHeight: ms(17) },
 
-  divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: vs(16),
-    gap: s(10),
-  },
-  dividerLine: { flex: 1, height: 1, backgroundColor: colors.divider },
-  dividerLabel: {
-    color: colors.textCaption,
-    fontSize: ms(10),
-    fontWeight: '700',
-    letterSpacing: ms(0.8),
-  },
+  ctaWrap: { marginTop: vs(12) },
 
-  socialRow: {
-    flexDirection: 'row',
-    gap: s(10),
-    marginBottom: vs(24),
-  },
-  socialBtn: {
-    flex: 1,
-    height: vs(48),
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: colors.divider,
-    backgroundColor: colors.card,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  socialBtnText: {
-    color: colors.textPrimary,
-    fontSize: ms(13),
-    fontWeight: '600',
-  },
-
+  // Footer
   switchRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
+    flexDirection: 'row', justifyContent: 'center', alignItems: 'center',
+    marginBottom: vs(16),
   },
-  switchText: { color: colors.textCaption, fontSize: ms(14) },
-  switchLink: { color: colors.accent, fontSize: ms(14), fontWeight: '700' },
-
-  legal: {
-    color: colors.textCaption,
-    fontSize: ms(11),
-    textAlign: 'center',
-    marginTop: vs(24),
-    lineHeight: ms(16),
-    paddingHorizontal: s(8),
-  },
+  switchLink: { fontWeight: '700' },
+  legal: { paddingHorizontal: s(8), lineHeight: ms(16) },
 });

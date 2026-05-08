@@ -1,8 +1,15 @@
-import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Dimensions, FlatList, Image, ScrollView, Share, StyleSheet, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  ActivityIndicator, Alert, Dimensions, FlatList, Image, NativeScrollEvent,
+  NativeSyntheticEvent, Platform, ScrollView, Share, StyleSheet, TouchableOpacity, View,
+} from 'react-native';
 import { Text, Surface } from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'react-native-linear-gradient';
+import { BlurView } from '@react-native-community/blur';
+import Animated, {
+  useAnimatedStyle, useSharedValue, withSpring,
+} from 'react-native-reanimated';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useQueryClient } from '@tanstack/react-query';
@@ -12,6 +19,7 @@ import { PremiumLockCard } from '../components/PremiumLockCard';
 import { RecommendationBadge } from '../components/RecommendationBadge';
 import { ScoreBadge } from '../components/ScoreBadge';
 import { ScoreBar } from '../components/ScoreBar';
+import { AppText } from '../components/AppText';
 import { findScoredProduct, loadScoredProducts } from '../services/productService';
 import { generateProductInsights, generateAdCopy, GeminiInsights } from '../services/geminiService';
 import { SCORE_DIMENSIONS } from '../services/scoringService';
@@ -29,10 +37,11 @@ import {
   queryKeys,
 } from '../hooks/queries';
 import { colors, gradients } from '../theme/colors';
-import { radius, spacing } from '../theme/spacing';
+import { radius, spacing, shadow } from '../theme/spacing';
 import { ms, s, vs } from '../theme/responsive';
 import { ScoredProduct } from '../types/product';
 import { formatCurrency } from '../utils/formatCurrency';
+import { hapticLight, hapticMedium, hapticSuccess, hapticWarning } from '../utils/haptics';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ProductDetail'>;
 
@@ -41,6 +50,7 @@ const { width } = Dimensions.get('window');
 export const ProductDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   const { productId } = route.params;
   const qc = useQueryClient();
+  const insets = useSafeAreaInsets();
 
   const [scored, setScored] = useState<ScoredProduct | null>(null);
   const [loading, setLoading] = useState(true);
@@ -49,6 +59,7 @@ export const ProductDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   const [adCopy, setAdCopy] = useState<AdCopyResult | null>(null);
   const [isGeneratingAdCopy, setIsGeneratingAdCopy] = useState(false);
   const [adCopyError, setAdCopyError] = useState<string | null>(null);
+  const [carouselIndex, setCarouselIndex] = useState(0);
 
   const { data: unlockedSet = new Set<string>() } = useUnlockedQuery();
   const { data: watchlistItems = [] } = useWatchlistQuery();
@@ -96,16 +107,19 @@ export const ProductDetailScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const onUnlock = () => {
     if (!scored) return;
+    hapticMedium();
     unlockMutation.mutate(
       { productId: scored.product.id, productTitle: scored.product.title, cost: scored.unlockCost },
       {
         onError: (_, vars) => {
+          hapticWarning();
           Alert.alert('Not enough credits', `You need ${vars.cost} credits but have ${credits}.`, [
             { text: 'Cancel', style: 'cancel' },
             { text: 'Buy Credits', onPress: () => navigation.navigate('BuyCredits' as any) },
           ]);
         },
         onSuccess: () => {
+          hapticSuccess();
           qc.invalidateQueries({ queryKey: queryKeys.creditBalance });
         },
       },
@@ -114,11 +128,34 @@ export const ProductDetailScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const toggleWatchlist = () => {
     if (!scored) return;
+    hapticLight();
     if (inWatchlist) {
       removeFromWatchlistMutation.mutate(scored.product.id);
     } else {
       addToWatchlistMutation.mutate({ productId: scored.product.id, status: 'Watching' });
     }
+  };
+
+  const handleShareProduct = async () => {
+    if (!scored) return;
+    hapticLight();
+    try {
+      await Share.share({
+        message: `${scored.product.title} — Score ${scored.winningScore}/100 on TrendPro`,
+        title: scored.product.title,
+      });
+    } catch { /* user cancelled */ }
+  };
+
+  const handleBackPress = () => {
+    hapticLight();
+    navigation.goBack();
+  };
+
+  const onCarouselScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const carouselItemWidth = Dimensions.get('window').width;
+    const i = Math.round(e.nativeEvent.contentOffset.x / carouselItemWidth);
+    if (i !== carouselIndex) setCarouselIndex(i);
   };
 
   const handleGenerateAdCopy = async () => {
@@ -162,69 +199,123 @@ export const ProductDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   if (loading || !scored) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }}>
-        <MaterialCommunityIcons name="loading" size={ms(32)} color={colors.accent} />
+        <ActivityIndicator size="large" color={colors.accent} />
       </View>
     );
   }
 
   const isLocked = scored.isPremium && !isUnlocked;
   const images = scored.product.images.length > 0 ? scored.product.images : [scored.product.thumbnail];
+  const carouselWidth = width;
 
   return (
-    <SafeAreaView style={styles.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Image carousel */}
-        <FlatList
-          data={images}
-          horizontal
-          pagingEnabled
-          showsHorizontalScrollIndicator={false}
-          keyExtractor={(uri, i) => `${uri}-${i}`}
-          style={styles.carousel}
-          renderItem={({ item }) => (
-            <View style={[styles.imageWrap, { width: width - spacing.lg * 2 }]}>
-              <Image source={{ uri: item }} style={styles.image} />
+    <View style={styles.safe}>
+      {/* ── Floating top bar (back + share) ── */}
+      <View style={[styles.topBar, { paddingTop: insets.top + vs(6) }]} pointerEvents="box-none">
+        <FloatingIconBtn icon="chevron-left" onPress={handleBackPress} />
+        <FloatingIconBtn
+          icon={inWatchlist ? 'star' : 'star-outline'}
+          onPress={toggleWatchlist}
+          tint={inWatchlist ? colors.warning : undefined}
+        />
+        <View style={{ flex: 1 }} />
+        <FloatingIconBtn icon="share-variant-outline" onPress={handleShareProduct} />
+      </View>
+
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* ── Hero image carousel — full bleed ── */}
+        <View style={styles.heroCarousel}>
+          <FlatList
+            data={images}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            keyExtractor={(uri, i) => `${uri}-${i}`}
+            onScroll={onCarouselScroll}
+            scrollEventThrottle={16}
+            renderItem={({ item }) => (
+              <View style={[styles.heroImageWrap, { width: carouselWidth }]}>
+                <Image source={{ uri: item }} style={styles.heroImage} />
+              </View>
+            )}
+          />
+
+          {/* Top scrim — improves contrast against status bar / floating buttons */}
+          <LinearGradient
+            colors={['rgba(0,0,0,0.35)', 'transparent']}
+            style={styles.heroTopScrim}
+            pointerEvents="none"
+          />
+
+          {/* Bottom scrim — fades hero into content */}
+          <LinearGradient
+            colors={['transparent', colors.background]}
+            style={styles.heroBottomScrim}
+            pointerEvents="none"
+          />
+
+          {/* Image counter pill (bottom-left) */}
+          {images.length > 1 && (
+            <View style={styles.counterPill}>
+              <AppText variant="caption2" color={colors.white} tabular>
+                {carouselIndex + 1} / {images.length}
+              </AppText>
             </View>
           )}
-        />
 
-        {/* Header */}
-        <View style={styles.headerRow}>
-          <View style={{ flex: 1, paddingRight: spacing.md }}>
-            <Text style={styles.category}>
-              {scored.product.category.toUpperCase()}{scored.product.brand ? ` · ${scored.product.brand}` : ''}
-            </Text>
-            <Text style={styles.title}>{isLocked ? blurTitle(scored.product.title) : scored.product.title}</Text>
-            <View style={styles.badgeRow}>
-              <RecommendationBadge recommendation={scored.recommendation} />
-              {scored.isPremium && (
-                <LinearGradient colors={gradients.premium} style={styles.premiumChip} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-                  <MaterialCommunityIcons name="diamond" size={ms(10)} color={colors.white} />
-                  <Text style={styles.premiumText}>PREMIUM</Text>
-                </LinearGradient>
-              )}
-              {scored.product.source === 'amazon' && (
-                <View style={styles.amazonChip}>
-                  <MaterialCommunityIcons name="amazon" size={ms(10)} color={colors.white} />
-                  <Text style={styles.amazonChipText}>Amazon</Text>
-                </View>
-              )}
-            </View>
+          {/* Score chip (bottom-right) */}
+          <View style={styles.heroScoreChip}>
+            <ScoreBadge score={scored.winningScore} rating10={scored.rating10} size="lg" />
+          </View>
+        </View>
+
+        {/* ── Header content ── */}
+        <View style={styles.headerSection}>
+          <AppText variant="caption2" color={colors.textCaption} uppercase style={styles.category}>
+            {scored.product.category}{scored.product.brand ? ` · ${scored.product.brand}` : ''}
+          </AppText>
+          <AppText variant="title1" color={colors.textPrimary} style={styles.title}>
+            {isLocked ? blurTitle(scored.product.title) : scored.product.title}
+          </AppText>
+
+          <View style={styles.badgeRow}>
+            <RecommendationBadge recommendation={scored.recommendation} />
+            {scored.isPremium && (
+              <LinearGradient
+                colors={gradients.premium}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                style={styles.premiumChip}
+              >
+                <MaterialCommunityIcons name="diamond" size={ms(10)} color={colors.white} />
+                <AppText variant="caption2" color={colors.white} uppercase style={styles.premiumText}>Premium</AppText>
+              </LinearGradient>
+            )}
             {scored.product.source === 'amazon' && (
-              <View style={styles.amazonMetaRow}>
-                {scored.product.salesRank != null && (
-                  <Text style={styles.amazonMeta}>#{scored.product.salesRank} in {scored.product.category}</Text>
-                )}
-                {scored.product.salesVolume && (
-                  <Text style={styles.amazonMeta}>{scored.product.salesVolume}</Text>
-                )}
-                {scored.product.asin ? (
-                  <Text style={styles.amazonAsin}>ASIN: {scored.product.asin}</Text>
-                ) : null}
+              <View style={styles.amazonChip}>
+                <MaterialCommunityIcons name="amazon" size={ms(10)} color={colors.white} />
+                <AppText variant="caption2" color={colors.white} uppercase style={styles.amazonChipText}>Amazon</AppText>
               </View>
             )}
           </View>
-          <ScoreBadge score={scored.winningScore} rating10={scored.rating10} size="lg" />
+
+          {scored.product.source === 'amazon' && (
+            <View style={styles.amazonMetaRow}>
+              {scored.product.salesRank != null && (
+                <AppText variant="footnote" color={colors.success} tabular>
+                  #{scored.product.salesRank} in {scored.product.category}
+                </AppText>
+              )}
+              {scored.product.salesVolume && (
+                <AppText variant="footnote" color={colors.success}>{scored.product.salesVolume}</AppText>
+              )}
+              {scored.product.asin ? (
+                <AppText variant="footnote" color={colors.muted} tabular>ASIN: {scored.product.asin}</AppText>
+              ) : null}
+            </View>
+          )}
         </View>
 
         {/* Premium lock */}
@@ -235,8 +326,8 @@ export const ProductDetailScreen: React.FC<Props> = ({ navigation, route }) => {
             rating10={scored.rating10}
             reason={scored.premiumReason}
             onUnlock={onUnlock}
-            onBuyCredits={() => navigation.navigate('BuyCredits' as any)}
-            style={{ marginTop: spacing.lg }}
+            onBuyCredits={() => { hapticLight(); navigation.navigate('BuyCredits' as any); }}
+            style={{ marginHorizontal: spacing.lg, marginBottom: spacing.md }}
           />
         )}
 
@@ -255,9 +346,12 @@ export const ProductDetailScreen: React.FC<Props> = ({ navigation, route }) => {
         {/* Score breakdown */}
         <Surface style={styles.card} elevation={1}>
           <View style={styles.cardHeaderRow}>
-            <Text style={styles.cardTitle}>Score Breakdown</Text>
-            <TouchableOpacity onPress={() => navigation.navigate('ScoreBreakdown', { productId: scored.product.id })}>
-              <Text style={styles.seeAll}>Full breakdown →</Text>
+            <AppText variant="headline" color={colors.textPrimary} style={styles.cardTitle}>Score Breakdown</AppText>
+            <TouchableOpacity
+              onPress={() => { hapticLight(); navigation.navigate('ScoreBreakdown', { productId: scored.product.id }); }}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            >
+              <AppText variant="footnote" color={colors.accent} style={styles.seeAll}>Full breakdown →</AppText>
             </TouchableOpacity>
           </View>
           {SCORE_DIMENSIONS.slice(0, 4).map((dim) => (
@@ -369,7 +463,7 @@ export const ProductDetailScreen: React.FC<Props> = ({ navigation, route }) => {
               {!adCopy && !isGeneratingAdCopy && adCopyError !== 'generation-failed' && (
                 credits >= AD_COPY_COST ? (
                   <TouchableOpacity
-                    onPress={handleGenerateAdCopy}
+                    onPress={() => { hapticMedium(); handleGenerateAdCopy(); }}
                     style={styles.adCopyGenBtn}
                     activeOpacity={0.85}
                   >
@@ -393,7 +487,7 @@ export const ProductDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                     <Text style={styles.adCopyInsufficientText}>
                       You need {AD_COPY_COST} credit to generate ad scripts. Top up to unlock this feature.
                     </Text>
-                    <TouchableOpacity onPress={() => navigation.navigate('BuyCredits' as any)}>
+                    <TouchableOpacity onPress={() => { hapticLight(); navigation.navigate('BuyCredits' as any); }}>
                       <Text style={styles.adCopyBuyLink}>Buy Credits →</Text>
                     </TouchableOpacity>
                   </View>
@@ -417,6 +511,7 @@ export const ProductDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                   </Text>
                   <TouchableOpacity
                     onPress={async () => {
+                      hapticMedium();
                       setIsGeneratingAdCopy(true);
                       setAdCopyError(null);
                       const result = await generateAdCopy(scored);
@@ -461,34 +556,36 @@ export const ProductDetailScreen: React.FC<Props> = ({ navigation, route }) => {
 
         {/* Action buttons */}
         <View style={styles.actionsWrap}>
-          <TouchableOpacity onPress={toggleWatchlist} activeOpacity={0.85} style={styles.watchlistBtn}>
+          <SpringTouchable onPress={toggleWatchlist} style={styles.watchlistBtn}>
             <MaterialCommunityIcons
               name={inWatchlist ? 'star' : 'star-outline'}
               size={ms(18)}
               color={inWatchlist ? colors.warning : colors.primary}
             />
-            <Text style={[styles.watchlistBtnText, inWatchlist && { color: colors.warning }]}>
+            <AppText
+              variant="callout"
+              color={inWatchlist ? colors.warning : colors.primary}
+              style={styles.watchlistBtnText}
+            >
               {inWatchlist ? 'Saved to Watchlist' : 'Save to Watchlist'}
-            </Text>
-          </TouchableOpacity>
+            </AppText>
+          </SpringTouchable>
 
           <View style={styles.actionsRow}>
-            <TouchableOpacity
-              onPress={() => navigation.navigate('CompareProducts', { initialProductId: scored.product.id })}
+            <SpringTouchable
+              onPress={() => { hapticLight(); navigation.navigate('CompareProducts', { initialProductId: scored.product.id }); }}
               style={styles.halfBtn}
-              activeOpacity={0.8}
             >
               <View style={styles.halfBtnInner}>
                 <MaterialCommunityIcons name="scale-balance" size={ms(16)} color={colors.accent} />
-                <Text style={styles.halfBtnText}>Compare</Text>
+                <AppText variant="callout" color={colors.primary} style={styles.halfBtnText}>Compare</AppText>
               </View>
-            </TouchableOpacity>
+            </SpringTouchable>
 
-            <TouchableOpacity
-              onPress={() => navigation.navigate('ProductTestPlan', { productId: scored.product.id })}
+            <SpringTouchable
+              onPress={() => { hapticMedium(); navigation.navigate('ProductTestPlan', { productId: scored.product.id }); }}
               disabled={isLocked}
-              style={[styles.halfBtn, isLocked && styles.halfBtnDisabled,{marginBottom:3}]}
-              activeOpacity={0.8}
+              style={[styles.halfBtn, isLocked && styles.halfBtnDisabled]}
             >
               <LinearGradient
                 colors={isLocked ? [colors.mutedSoft, colors.mutedSoft] : gradients.success}
@@ -501,11 +598,15 @@ export const ProductDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                   size={ms(16)}
                   color={isLocked ? colors.muted : colors.white}
                 />
-                <Text style={[styles.halfBtnText, { color: isLocked ? colors.muted : colors.white }]}>
+                <AppText
+                  variant="callout"
+                  color={isLocked ? colors.muted : colors.white}
+                  style={styles.halfBtnText}
+                >
                   Test Plan
-                </Text>
+                </AppText>
               </LinearGradient>
-            </TouchableOpacity>
+            </SpringTouchable>
           </View>
 
           {unlockMutation.isPending && (
@@ -513,7 +614,84 @@ export const ProductDetailScreen: React.FC<Props> = ({ navigation, route }) => {
           )}
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
+  );
+};
+
+// ─── Floating icon button (back / share) — BlurView pill ─────────────────────
+
+const FloatingIconBtn: React.FC<{
+  icon: string;
+  onPress: () => void;
+  tint?: string;
+}> = ({ icon, onPress, tint }) => {
+  const scale = useSharedValue(1);
+  const aStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+
+  return (
+    <Animated.View style={aStyle}>
+      <TouchableOpacity
+        onPress={onPress}
+        onPressIn={() => { scale.value = withSpring(0.92, { damping: 12, stiffness: 320 }); }}
+        onPressOut={() => { scale.value = withSpring(1, { damping: 14, stiffness: 280 }); }}
+        activeOpacity={0.85}
+        style={floatBtn.outer}
+        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+      >
+        {Platform.OS === 'ios' ? (
+          <BlurView
+            blurType="dark"
+            blurAmount={16}
+            reducedTransparencyFallbackColor="rgba(0,0,0,0.55)"
+            style={floatBtn.fill}
+          >
+            <MaterialCommunityIcons name={icon} size={ms(20)} color={tint ?? colors.white} />
+          </BlurView>
+        ) : (
+          <View style={[floatBtn.fill, floatBtn.androidFill]}>
+            <MaterialCommunityIcons name={icon} size={ms(20)} color={tint ?? colors.white} />
+          </View>
+        )}
+      </TouchableOpacity>
+    </Animated.View>
+  );
+};
+
+const floatBtn = StyleSheet.create({
+  outer: {
+    width: ms(38), height: ms(38), borderRadius: ms(19),
+    overflow: 'hidden',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)',
+    ...shadow.sm,
+  },
+  fill: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  androidFill: { backgroundColor: 'rgba(0,0,0,0.55)' },
+});
+
+// ─── Spring-press wrapper for action buttons ─────────────────────────────────
+
+const SpringTouchable: React.FC<{
+  onPress: () => void;
+  disabled?: boolean;
+  style?: any;
+  children: React.ReactNode;
+}> = ({ onPress, disabled, style, children }) => {
+  const scale = useSharedValue(1);
+  const aStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+
+  return (
+    <Animated.View style={[aStyle, style]}>
+      <TouchableOpacity
+        onPress={onPress}
+        onPressIn={() => { scale.value = withSpring(0.97, { damping: 14, stiffness: 320 }); }}
+        onPressOut={() => { scale.value = withSpring(1, { damping: 14, stiffness: 280 }); }}
+        disabled={disabled}
+        activeOpacity={0.88}
+        style={{ flex: 1 }}
+      >
+        {children}
+      </TouchableOpacity>
+    </Animated.View>
   );
 };
 
@@ -578,38 +756,86 @@ const LockedOverlay = ({ message }: { message: string }) => (
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
-  content: { padding: spacing.lg, paddingBottom: spacing.xxxl },
-  carousel: { marginHorizontal: -spacing.lg, marginBottom: spacing.lg },
-  imageWrap: {
-    height: vs(220), borderRadius: radius.xxl, overflow: 'hidden',
-    backgroundColor: colors.mutedSoft, marginHorizontal: spacing.sm,
+  content: { paddingBottom: spacing.xxxl },
+
+  // ── Floating top bar ──
+  topBar: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0,
+    zIndex: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: s(10),
+    paddingHorizontal: spacing.lg,
   },
-  image: { width: '100%', height: '100%', resizeMode: 'cover' },
-  headerRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: spacing.lg },
-  category: { fontSize: ms(10), fontWeight: '700', color: colors.textCaption, letterSpacing: ms(0.8) },
-  title: { fontSize: ms(24), fontWeight: '800', color: colors.primary, marginTop: vs(4), lineHeight: ms(30) },
-  badgeRow: { flexDirection: 'row', alignItems: 'center', gap: ms(8), marginTop: spacing.sm },
+
+  // ── Hero carousel ──
+  heroCarousel: {
+    width: '100%',
+    height: vs(340),
+    backgroundColor: colors.surfaceVariant,
+    overflow: 'hidden',
+    marginBottom: vs(4),
+  },
+  heroImageWrap: { height: '100%' },
+  heroImage: { width: '100%', height: '100%', resizeMode: 'cover' },
+  heroTopScrim: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0,
+    height: vs(120),
+  },
+  heroBottomScrim: {
+    position: 'absolute',
+    bottom: 0, left: 0, right: 0,
+    height: vs(40),
+  },
+  counterPill: {
+    position: 'absolute',
+    bottom: vs(16),
+    left: spacing.lg,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: radius.pill,
+    paddingHorizontal: s(10),
+    paddingVertical: vs(4),
+  },
+  heroScoreChip: {
+    position: 'absolute',
+    bottom: vs(14),
+    right: spacing.lg,
+  },
+
+  // ── Header content ──
+  headerSection: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.lg,
+  },
+  category: { letterSpacing: ms(0.8) },
+  title: { marginTop: vs(4), lineHeight: ms(34) },
+  badgeRow: { flexDirection: 'row', alignItems: 'center', gap: ms(8), marginTop: spacing.sm, flexWrap: 'wrap' },
   premiumChip: {
     flexDirection: 'row', alignItems: 'center', gap: ms(4),
     borderRadius: radius.pill, paddingHorizontal: s(10), paddingVertical: vs(4),
   },
-  premiumText: { color: colors.white, fontSize: ms(9), fontWeight: '800', letterSpacing: ms(1) },
+  premiumText: { letterSpacing: ms(1), fontWeight: '800' },
   amazonChip: {
     flexDirection: 'row', alignItems: 'center', gap: ms(4),
     backgroundColor: '#FF9900', borderRadius: radius.pill,
     paddingHorizontal: s(10), paddingVertical: vs(4),
   },
-  amazonChipText: { color: colors.white, fontSize: ms(9), fontWeight: '800' },
+  amazonChipText: { fontWeight: '800' },
   amazonMetaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: s(12), marginTop: vs(6) },
-  amazonMeta: { fontSize: ms(11), fontWeight: '600', color: colors.success },
-  amazonAsin: { fontSize: ms(11), color: colors.muted },
+
   card: {
     borderRadius: radius.xxl, backgroundColor: colors.card,
     padding: spacing.lg, marginBottom: spacing.md,
+    marginHorizontal: spacing.lg,
+    borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border,
+    ...shadow.sm,
   },
-  cardTitle: { fontSize: ms(16), fontWeight: '700', color: colors.primary, marginBottom: spacing.sm },
+  cardTitle: { marginBottom: spacing.sm, fontWeight: '700' },
   cardHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm },
-  seeAll: { fontSize: ms(12), color: colors.accent, fontWeight: '600' },
+  seeAll: { fontWeight: '600' },
   priceGrid: { flexDirection: 'row', flexWrap: 'wrap' },
   priceCell: { width: '50%', paddingVertical: spacing.sm },
   priceCellLabel: { fontSize: ms(10), fontWeight: '700', color: colors.muted, letterSpacing: ms(0.8) },
@@ -637,12 +863,10 @@ const styles = StyleSheet.create({
   // AI card (unlocked)
   aiCard: {
     borderRadius: radius.xxl, padding: spacing.lg, marginBottom: spacing.md,
+    marginHorizontal: spacing.lg,
     backgroundColor: colors.card,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: ms(2) },
-    shadowOpacity: 0.06,
-    shadowRadius: ms(12),
-    elevation: 2,
+    borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border,
+    ...shadow.md,
   },
   aiHeader: { flexDirection: 'row', alignItems: 'center', gap: ms(8), marginBottom: vs(10) },
   aiIconWrap: {
@@ -660,8 +884,11 @@ const styles = StyleSheet.create({
   // AI locked card
   aiLockedCard: {
     borderRadius: radius.xxl, padding: spacing.xl, marginBottom: spacing.md,
+    marginHorizontal: spacing.lg,
     alignItems: 'center', gap: ms(10),
     backgroundColor: colors.surfaceVariant,
+    borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border,
+    ...shadow.sm,
   },
   aiLockedTitle: { color: colors.textPrimary, fontSize: ms(18), fontWeight: '800' },
   aiLockedBody: { color: colors.textCaption, fontSize: ms(13), textAlign: 'center', lineHeight: ms(20) },
@@ -680,15 +907,16 @@ const styles = StyleSheet.create({
   adAngle: { color: colors.accent, fontStyle: 'italic' },
 
   // Actions
-  actionsWrap: { gap: spacing.sm },
+  actionsWrap: { gap: spacing.sm, paddingHorizontal: spacing.lg, marginTop: spacing.sm },
   actionsRow: { flexDirection: 'row', gap: spacing.sm },
   watchlistBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: ms(8),
     borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.border,
     backgroundColor: colors.card, paddingVertical: vs(13),
+    ...shadow.sm,
   },
-  watchlistBtnText: { fontSize: ms(15), fontWeight: '700', color: colors.primary },
-  halfBtn: { flex: 1, borderRadius: radius.pill, overflow: 'hidden' },
+  watchlistBtnText: { fontWeight: '700' },
+  halfBtn: { flex: 1, borderRadius: radius.pill, overflow: 'hidden', ...shadow.sm },
   halfBtnDisabled: { opacity: 0.5 },
   halfBtnInner: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: ms(6),
@@ -699,7 +927,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: ms(6), paddingVertical: vs(13),
   },
-  halfBtnText: { fontSize: ms(14), fontWeight: '700', color: colors.primary },
+  halfBtnText: { fontWeight: '700' },
   actionBtn: { borderRadius: radius.lg, flex: 1 },
   actionBtnContent: { paddingVertical: vs(4) },
   unlockingText: { fontSize: ms(12), color: colors.muted, textAlign: 'center' },

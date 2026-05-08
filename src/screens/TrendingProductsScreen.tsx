@@ -152,7 +152,6 @@ export const TrendingProductsScreen: React.FC<Props> = () => {
           data={pagedProducts}
           keyExtractor={(item) => item.product.id}
           contentContainerStyle={styles.list}
-          getItemLayout={(_, index) => ({ length: vs(110), offset: vs(110) * index, index })}
           onEndReached={loadMore}
           onEndReachedThreshold={0.3}
           renderItem={({ item }) => (

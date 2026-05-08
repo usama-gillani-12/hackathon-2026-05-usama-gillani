@@ -12,7 +12,7 @@ import { findScoredProduct, loadScoredProducts } from '../services/productServic
 import { SCORE_DIMENSIONS } from '../services/scoringService';
 import { colors } from '../theme/colors';
 import { radius, spacing } from '../theme/spacing';
-import { ms, vs } from '../theme/responsive';
+import { ms, s, vs } from '../theme/responsive';
 import { ScoredProduct } from '../types/product';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ScoreBreakdown'>;
@@ -79,6 +79,51 @@ export const ScoreBreakdownScreen: React.FC<Props> = ({ route }) => {
           ))}
         </Surface>
 
+        {/* Social Buzz Sources breakdown */}
+        {scored.socialBuzzSources && (
+          <Surface style={styles.card} elevation={1}>
+            <View style={styles.buzzHeader}>
+              <MaterialCommunityIcons name="signal-variant" size={ms(18)} color={colors.accent} />
+              <Text style={styles.cardTitle}>Social Buzz Sources</Text>
+            </View>
+            <Text style={styles.buzzSub}>
+              Final buzz score is a weighted blend — YouTube search volume (60%) + Reddit community engagement (40%).
+            </Text>
+
+            {/* YouTube */}
+            <View style={styles.buzzSourceRow}>
+              <View style={styles.buzzSourceLabel}>
+                <View style={[styles.buzzDot, { backgroundColor: '#FF0000' }]} />
+                <Text style={styles.buzzSourceName}>YouTube</Text>
+                <Text style={styles.buzzSourcePct}>60%</Text>
+              </View>
+              <View style={styles.buzzBarWrap}>
+                <View style={[styles.buzzBarFill, { width: `${scored.socialBuzzSources.youtube}%`, backgroundColor: '#FF0000' }]} />
+              </View>
+              <Text style={[styles.buzzScore, { color: '#FF0000' }]}>{scored.socialBuzzSources.youtube}</Text>
+            </View>
+
+            {/* Reddit */}
+            <View style={styles.buzzSourceRow}>
+              <View style={styles.buzzSourceLabel}>
+                <View style={[styles.buzzDot, { backgroundColor: '#FF6600' }]} />
+                <Text style={styles.buzzSourceName}>Reddit</Text>
+                <Text style={styles.buzzSourcePct}>40%</Text>
+              </View>
+              <View style={styles.buzzBarWrap}>
+                <View style={[styles.buzzBarFill, { width: `${scored.socialBuzzSources.reddit}%`, backgroundColor: '#FF6600' }]} />
+              </View>
+              <Text style={[styles.buzzScore, { color: '#FF6600' }]}>{scored.socialBuzzSources.reddit}</Text>
+            </View>
+
+            {/* Blended result */}
+            <View style={styles.buzzBlendRow}>
+              <Text style={styles.buzzBlendLabel}>Blended Score</Text>
+              <Text style={styles.buzzBlendValue}>{scored.scoreBreakdown.socialBuzz}/100</Text>
+            </View>
+          </Surface>
+        )}
+
         {/* Interpretation */}
         <Surface style={styles.card} elevation={1}>
           <Text style={styles.cardTitle}>What This Means</Text>
@@ -127,4 +172,38 @@ const styles = StyleSheet.create({
     borderRadius: radius.md, padding: spacing.md,
   },
   highlightText: { fontSize: ms(13), color: colors.accent, fontWeight: '600' },
+
+  // ── Social Buzz Sources card
+  buzzHeader: { flexDirection: 'row', alignItems: 'center', gap: s(8), marginBottom: vs(4) },
+  buzzSub: { fontSize: ms(12), color: colors.muted, lineHeight: ms(18), marginBottom: vs(16) },
+  buzzSourceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: s(8),
+    marginBottom: vs(12),
+  },
+  buzzSourceLabel: { flexDirection: 'row', alignItems: 'center', gap: s(6), width: ms(100) },
+  buzzDot: { width: ms(8), height: ms(8), borderRadius: ms(4) },
+  buzzSourceName: { fontSize: ms(12), fontWeight: '700', color: colors.textPrimary, flex: 1 },
+  buzzSourcePct: { fontSize: ms(11), color: colors.muted, fontWeight: '600' },
+  buzzBarWrap: {
+    flex: 1,
+    height: ms(7),
+    backgroundColor: colors.divider,
+    borderRadius: radius.pill,
+    overflow: 'hidden',
+  },
+  buzzBarFill: { height: '100%', borderRadius: radius.pill },
+  buzzScore: { width: ms(28), fontSize: ms(12), fontWeight: '800', textAlign: 'right' },
+  buzzBlendRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: colors.divider,
+    paddingTop: vs(10),
+    marginTop: vs(4),
+  },
+  buzzBlendLabel: { fontSize: ms(13), fontWeight: '700', color: colors.muted },
+  buzzBlendValue: { fontSize: ms(16), fontWeight: '900', color: colors.accent },
 });

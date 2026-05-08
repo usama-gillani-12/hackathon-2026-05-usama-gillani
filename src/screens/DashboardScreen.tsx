@@ -3,6 +3,7 @@ import {
   Animated as RNAnimated,
   Dimensions,
   Image,
+  Linking,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -15,6 +16,7 @@ import { LinearGradient } from 'react-native-linear-gradient';
 import Animated, {
   FadeInDown,
   FadeInRight,
+  useAnimatedScrollHandler,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
@@ -23,6 +25,7 @@ import Animated, {
   withTiming,
   interpolate,
   Extrapolation,
+  type SharedValue,
 } from 'react-native-reanimated';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -39,10 +42,13 @@ import { formatCurrency } from '../utils/formatCurrency';
 import { RecommendationBadge } from '../components/RecommendationBadge';
 import { DashboardSkeleton } from '../components/skeletons/DashboardSkeleton';
 import { DashboardStats, ScoredProduct } from '../types/product';
+import { MarketPulseItem, TrendingPost } from '../types/market';
+import { fetchMarketPulse, MARKET_PULSE_FALLBACK } from '../api/redditMarketApi';
+import { fetchTrendingPosts } from '../api/hackerNewsApi';
 
 type Props = BottomTabScreenProps<BottomTabParamList, 'Dashboard'>;
 
-const { width: SCREEN_W } = Dimensions.get('window');
+const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
 // ── Design tokens ──────────────────────────────────────────────────────────────
 const BG = colors.background;
@@ -52,14 +58,6 @@ const GLASS = colors.surfaceVariant;
 const GLASS_BORDER = colors.border;
 
 // ── Static data ────────────────────────────────────────────────────────────────
-const MARKET_PULSE = [
-  { category: 'Electronics', score: 84, trend: '+12%', hot: true, emoji: '📱', bars: [40, 55, 48, 70, 84] },
-  { category: 'Beauty', score: 91, trend: '+28%', hot: true, emoji: '💄', bars: [60, 72, 68, 85, 91] },
-  { category: 'Kitchen', score: 76, trend: '+8%', hot: false, emoji: '🍳', bars: [65, 60, 70, 72, 76] },
-  { category: 'Fitness', score: 88, trend: '+19%', hot: true, emoji: '💪', bars: [50, 65, 72, 80, 88] },
-  { category: 'Pet Supplies', score: 79, trend: '+11%', hot: false, emoji: '🐾', bars: [60, 65, 72, 75, 79] },
-  { category: 'Fashion', score: 72, trend: '+5%', hot: false, emoji: '👗', bars: [65, 68, 66, 70, 72] },
-];
 
 const QUICK_ACTIONS = [
   { icon: 'fire', label: 'Trending', colors: gradients.gold, screen: 'TrendingProducts' },
@@ -129,6 +127,55 @@ const countStyles = StyleSheet.create({
   num: { fontSize: ms(26), fontWeight: '900', letterSpacing: -1 },
 });
 
+// ── Scroll-driven animated dimension bar ──────────────────────────────────────
+// Runs entirely on the UI thread — no JS-thread onScroll callbacks.
+const AnimatedDimBar: React.FC<{
+  weight: number;
+  color: string;
+  index: number;
+  scrollY: SharedValue<number>;
+  sectionY: SharedValue<number>;
+}> = ({ weight, color, index, scrollY, sectionY }) => {
+  const containerW = useSharedValue(0);
+
+  const fillStyle = useAnimatedStyle(() => {
+    // Guard: section not yet measured → stay at 0
+    if (sectionY.value === 0 || containerW.value === 0) return { width: 0 };
+
+    // Trigger point: section enters viewport at ~70% down the screen.
+    // Each bar staggers 25px of scroll behind the previous one.
+    const stagger = index * 25;
+    const triggerStart = sectionY.value - SCREEN_H * 0.7 + stagger;
+    const triggerEnd = triggerStart + 260;
+    const targetW = containerW.value * (weight / 100);
+
+    return {
+      width: interpolate(
+        scrollY.value,
+        [triggerStart, triggerEnd],
+        [0, targetW],
+        Extrapolation.CLAMP,
+      ),
+    };
+  });
+
+  return (
+    <View
+      style={styles.dimBarBg}
+      onLayout={(e) => { containerW.value = e.nativeEvent.layout.width; }}
+    >
+      <Animated.View style={[styles.dimBarFillAnimated, fillStyle]}>
+        <LinearGradient
+          colors={[color, color + 'AA']}
+          style={StyleSheet.absoluteFill}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+        />
+      </Animated.View>
+    </View>
+  );
+};
+
 // ── Main screen ───────────────────────────────────────────────────────────────
 export const DashboardScreen: React.FC<Props> = () => {
   const navigation = useNavigation<any>();
@@ -144,6 +191,10 @@ export const DashboardScreen: React.FC<Props> = () => {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [topOpportunity, setTopOpportunity] = useState<ScoredProduct | null>(null);
   const [pulseIndex, setPulseIndex] = useState(0);
+  const [marketPulse, setMarketPulse] = useState<MarketPulseItem[]>(MARKET_PULSE_FALLBACK);
+  const [pulseLoading, setPulseLoading] = useState(false);
+  const [trendingPosts, setTrendingPosts] = useState<TrendingPost[]>([]);
+  const [trendingLoading, setTrendingLoading] = useState(false);
 
   // ── Animated live dot
   const liveDotAnim = useRef(new RNAnimated.Value(1)).current;
@@ -194,6 +245,15 @@ export const DashboardScreen: React.FC<Props> = () => {
   }, []);
   const glowStyle = useAnimatedStyle(() => ({ opacity: glowOpacity.value }));
 
+  // ── Scroll-driven bar animations
+  const scrollY = useSharedValue(0);
+  const aiSectionY = useSharedValue(0);
+  const scrollHandler = useAnimatedScrollHandler({
+    onScroll: (e) => {
+      scrollY.value = e.contentOffset.y;
+    },
+  });
+
   // ── Data loading
   const buildStats = useCallback(async (prods: ScoredProduct[]) => {
     const unlockedSet = await getUnlockedIdSet();
@@ -216,14 +276,40 @@ export const DashboardScreen: React.FC<Props> = () => {
     setRefreshing(false);
   }, []);
 
+  const loadPulse = useCallback(async () => {
+    setPulseLoading(true);
+    try {
+      const items = await fetchMarketPulse();
+      setMarketPulse(items);
+    } catch {
+      // fallback already set as initial state
+    } finally {
+      setPulseLoading(false);
+    }
+  }, []);
+
+  const loadTrending = useCallback(async () => {
+    setTrendingLoading(true);
+    try {
+      const posts = await fetchTrendingPosts();
+      setTrendingPosts(posts);
+    } catch {
+      // section stays hidden when empty
+    } finally {
+      setTrendingLoading(false);
+    }
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       load(false);
+      loadPulse();
+      loadTrending();
       const interval = setInterval(() => {
-        setPulseIndex((i) => (i + 1) % MARKET_PULSE.length);
+        setPulseIndex((i) => (i + 1) % marketPulse.length);
       }, 2800);
       return () => clearInterval(interval);
-    }, [load]),
+    }, [load, loadPulse, loadTrending, marketPulse.length]),
   );
 
   const onRefresh = () => {
@@ -248,7 +334,9 @@ export const DashboardScreen: React.FC<Props> = () => {
 
   return (
     <SafeAreaView style={styles.safe} edges={[]}>
-      <ScrollView
+      <Animated.ScrollView
+        onScroll={scrollHandler}
+        scrollEventThrottle={16}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />}
@@ -384,7 +472,7 @@ export const DashboardScreen: React.FC<Props> = () => {
             </View>
             <View style={styles.liveBadge}>
               <RNAnimated.View style={[styles.liveBadgeDot, { transform: [{ scale: liveDotAnim }] }]} />
-              <Text style={styles.liveBadgeText}>LIVE</Text>
+              <Text style={styles.liveBadgeText}>{pulseLoading ? 'LOADING' : 'LIVE'}</Text>
             </View>
           </View>
 
@@ -393,7 +481,7 @@ export const DashboardScreen: React.FC<Props> = () => {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.pulseScrollContent}
           >
-            {MARKET_PULSE.map((item, i) => {
+            {marketPulse.map((item, i) => {
               const isActive = pulseIndex === i;
               const pulseColor = item.hot ? colors.premium : colors.success;
               return (
@@ -450,6 +538,85 @@ export const DashboardScreen: React.FC<Props> = () => {
             })}
           </ScrollView>
         </Animated.View>
+
+        {/* ══════════════════════════════════════════════════════════════
+            WHAT'S TRENDING — HackerNews Show HN feed
+        ══════════════════════════════════════════════════════════════ */}
+        {(trendingPosts.length > 0 || trendingLoading) && (
+          <Animated.View entering={FadeInDown.delay(140).springify().damping(14)}>
+            <View style={styles.sectionHeader}>
+              <View>
+                <Text style={styles.sectionTitle}>What's Trending</Text>
+                <Text style={styles.sectionSub}>Real product launches · Show HN</Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => Linking.openURL('https://news.ycombinator.com/show')}
+                style={styles.hnBadge}
+              >
+                <Text style={styles.hnBadgeText}>HN</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.trendScrollContent}
+            >
+              {trendingPosts.map((post, i) => (
+                <Animated.View
+                  key={post.id}
+                  entering={FadeInRight.delay(i * 55).springify().damping(14)}
+                >
+                  <TouchableOpacity
+                    onPress={() => Linking.openURL(post.url)}
+                    activeOpacity={0.82}
+                    style={styles.trendCard}
+                  >
+                    <LinearGradient
+                      colors={[colors.heroDark, colors.heroMid]}
+                      style={styles.trendCardInner}
+                    >
+                      {/* Category + badges row */}
+                      <View style={styles.trendTopRow}>
+                        <View style={styles.trendCatBadge}>
+                          <Text style={styles.trendCatText}>{post.category}</Text>
+                        </View>
+                        {post.isNew && (
+                          <View style={[styles.trendStatusBadge, { backgroundColor: 'rgba(46,125,90,0.25)' }]}>
+                            <Text style={[styles.trendStatusText, { color: colors.success }]}>NEW</Text>
+                          </View>
+                        )}
+                        {post.isHot && (
+                          <View style={[styles.trendStatusBadge, { backgroundColor: 'rgba(192,139,48,0.2)' }]}>
+                            <Text style={[styles.trendStatusText, { color: colors.accent }]}>HOT</Text>
+                          </View>
+                        )}
+                      </View>
+
+                      {/* Title */}
+                      <Text style={styles.trendTitle} numberOfLines={3}>
+                        {post.title}
+                      </Text>
+
+                      {/* Stats row */}
+                      <View style={styles.trendStatsRow}>
+                        <View style={styles.trendStat}>
+                          <MaterialCommunityIcons name="fire" size={ms(12)} color={colors.accent} />
+                          <Text style={styles.trendStatText}>{post.points}</Text>
+                        </View>
+                        <View style={styles.trendStat}>
+                          <MaterialCommunityIcons name="comment-outline" size={ms(12)} color={colors.muted} />
+                          <Text style={styles.trendStatText}>{post.comments}</Text>
+                        </View>
+                        <Text style={styles.trendTime}>{post.createdAt}</Text>
+                      </View>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </Animated.View>
+              ))}
+            </ScrollView>
+          </Animated.View>
+        )}
 
         {/* ══════════════════════════════════════════════════════════════
             TOP OPPORTUNITY
@@ -565,7 +732,11 @@ export const DashboardScreen: React.FC<Props> = () => {
         {/* ══════════════════════════════════════════════════════════════
             7-DIMENSION AI SCORING
         ══════════════════════════════════════════════════════════════ */}
-        <Animated.View entering={FadeInDown.delay(280).springify().damping(14)} style={styles.sectionPad}>
+        <Animated.View
+          entering={FadeInDown.delay(280).springify().damping(14)}
+          style={styles.sectionPad}
+          onLayout={(e) => { aiSectionY.value = e.nativeEvent.layout.y; }}
+        >
           <View style={styles.aiCard}>
             <View style={styles.aiCardInner}>
               <View style={styles.aiHeader}>
@@ -579,17 +750,16 @@ export const DashboardScreen: React.FC<Props> = () => {
               </View>
 
               <View style={styles.dimsWrap}>
-                {SCORE_DIMS.map((d) => (
+                {SCORE_DIMS.map((d, i) => (
                   <View key={d.label} style={styles.dimRow}>
                     <Text style={styles.dimLabel}>{d.label}</Text>
-                    <View style={styles.dimBarBg}>
-                      <LinearGradient
-                        colors={[d.color, d.color + 'AA']}
-                        style={[styles.dimBarFill, { width: `${d.weight * 4}%` }]}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                      />
-                    </View>
+                    <AnimatedDimBar
+                      weight={d.weight}
+                      color={d.color}
+                      index={i}
+                      scrollY={scrollY}
+                      sectionY={aiSectionY}
+                    />
                     <Text style={[styles.dimWeight, { color: d.color }]}>{d.weight}%</Text>
                   </View>
                 ))}
@@ -609,7 +779,7 @@ export const DashboardScreen: React.FC<Props> = () => {
           </View>
         </Animated.View>
 
-      </ScrollView>
+      </Animated.ScrollView>
     </SafeAreaView>
   );
 };
@@ -1008,6 +1178,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   dimBarFill: { height: '100%', borderRadius: radius.pill },
+  dimBarFillAnimated: { height: '100%', borderRadius: radius.pill, overflow: 'hidden' },
   dimWeight: { width: ms(34), fontSize: ms(11), fontWeight: '800', textAlign: 'right' },
 
   aiCta: { borderRadius: radius.lg, overflow: 'hidden' },
@@ -1022,4 +1193,55 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
   },
   aiCtaText: { color: colors.accent, fontSize: ms(13), fontWeight: '700' },
+
+  // ── What's Trending (HN)
+  hnBadge: {
+    backgroundColor: 'rgba(255,102,0,0.15)',
+    borderRadius: radius.sm,
+    paddingHorizontal: s(10),
+    paddingVertical: vs(5),
+    borderWidth: 1,
+    borderColor: 'rgba(255,102,0,0.3)',
+  },
+  hnBadgeText: { color: '#FF6600', fontSize: ms(11), fontWeight: '900', letterSpacing: 0.5 },
+
+  trendScrollContent: { paddingHorizontal: spacing.lg, gap: s(10), paddingBottom: vs(4) },
+  trendCard: {
+    borderRadius: radius.xl,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: CARD_BORDER,
+  },
+  trendCardInner: {
+    width: ms(190),
+    padding: ms(14),
+    gap: vs(8),
+  },
+  trendTopRow: { flexDirection: 'row', alignItems: 'center', gap: s(6), flexWrap: 'wrap' },
+  trendCatBadge: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: radius.sm,
+    paddingHorizontal: s(7),
+    paddingVertical: vs(2),
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  trendCatText: { color: 'rgba(255,255,255,0.55)', fontSize: ms(9), fontWeight: '700', letterSpacing: 0.4 },
+  trendStatusBadge: {
+    borderRadius: radius.pill,
+    paddingHorizontal: s(6),
+    paddingVertical: vs(2),
+  },
+  trendStatusText: { fontSize: ms(9), fontWeight: '900', letterSpacing: 0.6 },
+  trendTitle: {
+    fontSize: ms(13),
+    fontWeight: '700',
+    color: '#F1F5F9',
+    lineHeight: ms(19),
+    flex: 1,
+  },
+  trendStatsRow: { flexDirection: 'row', alignItems: 'center', gap: s(10), marginTop: vs(2) },
+  trendStat: { flexDirection: 'row', alignItems: 'center', gap: s(3) },
+  trendStatText: { color: 'rgba(255,255,255,0.5)', fontSize: ms(11), fontWeight: '600' },
+  trendTime: { color: 'rgba(255,255,255,0.3)', fontSize: ms(10), marginLeft: 'auto' },
 });

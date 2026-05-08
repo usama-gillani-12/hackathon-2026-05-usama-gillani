@@ -1,4 +1,4 @@
-export type ProductSource = 'dummyjson' | 'fakestore' | 'mock' | 'amazon';
+export type ProductSource = 'dummyjson' | 'fakestore' | 'mock' | 'amazon' | 'bestbuy';
 
 export interface Product {
   id: string;
@@ -49,6 +49,7 @@ export interface ScoredProduct {
   whyTrending: string;
   risksToWatch: string;
   premiumReason: string;
+  socialBuzzSources?: { youtube: number; reddit: number };
 }
 
 export type WatchlistStatus = 'Testing' | 'Watching' | 'Avoided';

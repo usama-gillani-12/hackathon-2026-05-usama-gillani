@@ -58,6 +58,7 @@ There are no automated tests. TypeScript (`yarn ts:check`) is the primary correc
 ## Source directory structure
 
 ```
+plans/            # Feature implementation plans (one .md per feature)
 src/
   api/              # Raw fetch functions for each data source (Amazon, DummyJSON, FakeStore, YouTube)
   components/       # Shared reusable UI components
@@ -248,6 +249,38 @@ const { items, total, hasMore, isLoadingMore, loadMore } = usePaginatedList(filt
 ```
 
 `ListFooterLoader` (`src/components/ListFooterLoader.tsx`) renders an `ActivityIndicator` while loading more, then "All N items shown" once the list is exhausted, and nothing while there are more items yet to load.
+
+## Feature Plans
+
+Every non-trivial feature or multi-phase implementation **must** have a plan file at `plans/<feature-slug>.md` before or alongside the code. The plan is a permanent record — write it even if you implement the feature in the same session.
+
+### Plan file structure
+
+```markdown
+# Feature Name — Feature Plan
+
+## Why This Feature
+<1–3 sentences on the problem and business value>
+
+## Phases / Sections
+<One section per phase. Each phase includes:>
+- What it does (plain language)
+- How it works (data flow, key logic decisions)
+- API used and why chosen
+- Files changed table
+
+## Verification
+<bash commands + test flow checklist>
+```
+
+### Rules
+- **Always create a plan file** for any feature that touches ≥ 3 files or adds a new API integration.
+- Mark phases as `✅ Done` as they complete — the file is living documentation.
+- When choosing between free APIs, document **why** you picked one over alternatives (e.g. "Product Hunt requires OAuth, HN Algolia is zero-key").
+- Plan files live at the repo root in `plans/`, not inside `src/`.
+- Use the `/feature-plan` skill to scaffold a plan interactively before implementation.
+
+---
 
 ## Things to Never Do
 

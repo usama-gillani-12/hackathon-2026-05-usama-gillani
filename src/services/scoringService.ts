@@ -160,7 +160,8 @@ function premiumReasonFor(rating10: number): string {
 }
 
 export interface ScoreInputs {
-  socialBuzz: number; // 0–100
+  socialBuzz: number;     // 0–100 YouTube-derived score
+  redditBuzz?: number;    // 0–100 Reddit community score (optional, blended in when present)
 }
 
 export function buildScore(product: Product, inputs: ScoreInputs): ScoredProduct {
@@ -187,9 +188,15 @@ export function buildScore(product: Product, inputs: ScoreInputs): ScoredProduct
   const riskRaw = RISK_BY_CATEGORY[cat] ?? 45;
   const risk = clamp(riskRaw, 0, 100);
 
+  // Blend YouTube (60%) + Reddit (40%) when both are available
+  const blendedBuzz =
+    inputs.redditBuzz !== undefined
+      ? Math.round(clamp(inputs.socialBuzz * 0.6 + inputs.redditBuzz * 0.4))
+      : inputs.socialBuzz;
+
   const breakdown: ScoreBreakdown = {
     demand,
-    socialBuzz: inputs.socialBuzz,
+    socialBuzz: blendedBuzz,
     profitPotential,
     productRating,
     shippingEase,
@@ -215,7 +222,8 @@ export function buildScore(product: Product, inputs: ScoreInputs): ScoredProduct
   const audience = pickAudience(cat);
   const adAngle = pickAdAngle(product.title, cat);
 
-  const aiSummary = `${product.title} sits in a category with ${competition >= 70 ? 'heavy' : competition >= 50 ? 'moderate' : 'light'} competition and ${inputs.socialBuzz >= 75 ? 'rising' : inputs.socialBuzz >= 50 ? 'steady' : 'soft'} social buzz. With an estimated ${margin.marginPercent}% margin at a $${margin.suggestedPrice.toFixed(2)} retail price, it ${winningScore >= 70 ? 'looks worth testing this week' : 'needs more validation before scaling ad spend'}.`;
+  const buzzLabel = blendedBuzz >= 75 ? 'rising' : blendedBuzz >= 50 ? 'steady' : 'soft';
+  const aiSummary = `${product.title} sits in a category with ${competition >= 70 ? 'heavy' : competition >= 50 ? 'moderate' : 'light'} competition and ${buzzLabel} social buzz${inputs.redditBuzz !== undefined ? ` (YouTube + Reddit blend: ${blendedBuzz}/100)` : ''}. With an estimated ${margin.marginPercent}% margin at a $${margin.suggestedPrice.toFixed(2)} retail price, it ${winningScore >= 70 ? 'looks worth testing this week' : 'needs more validation before scaling ad spend'}.`;
 
   const whyTrending = `${product.title.split(' ')[0]} videos in this niche are getting ${inputs.socialBuzz >= 80 ? 'millions of views' : 'steady traction'} on TikTok. Demand signal is reinforced by a ${rating.toFixed(1)}/5 rating and ${stock} units in stock across suppliers.`;
 
@@ -240,6 +248,10 @@ export function buildScore(product: Product, inputs: ScoreInputs): ScoredProduct
     whyTrending,
     risksToWatch,
     premiumReason: premiumReasonFor(rating10),
+    socialBuzzSources:
+      inputs.redditBuzz !== undefined
+        ? { youtube: inputs.socialBuzz, reddit: inputs.redditBuzz }
+        : undefined,
   };
 }
 
@@ -269,7 +281,7 @@ export const SCORE_DIMENSIONS: { key: keyof ScoreBreakdown; label: string; expla
   {
     key: 'socialBuzz',
     label: 'Social Buzz',
-    explainer: 'How loud the conversation is on TikTok, YouTube, and Reels.',
+    explainer: 'Blended signal from YouTube search volume (60%) and Reddit community engagement (40%).',
   },
   {
     key: 'profitPotential',

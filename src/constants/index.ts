@@ -35,6 +35,9 @@ export const RAPIDAPI_HOST = 'real-time-amazon-data.p.rapidapi.com';
 export const DUMMYJSON_BASE_URL = 'https://dummyjson.com';
 export const FAKESTORE_BASE_URL = 'https://fakestoreapi.com';
 export const YOUTUBE_BASE_URL = 'https://www.googleapis.com/youtube/v3';
+export const REDDIT_BASE_URL = 'https://www.reddit.com';
+export const HN_ALGOLIA_URL = 'https://hn.algolia.com/api/v1';
+export const BESTBUY_BASE_URL = 'https://api.bestbuy.com/v1';
 
 // ─── Deep-link / navigation ───────────────────────────────────────────────────
 export const APP_SCHEME = 'trendpro';

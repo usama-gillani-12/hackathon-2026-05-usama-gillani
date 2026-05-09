@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Dimensions, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'react-native-linear-gradient';
 import Animated, {
@@ -12,13 +12,11 @@ import Animated, {
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { colors, gradients } from '../theme/colors';
-import { radius, shadow } from '../theme/spacing';
+import { radius, shadow, spacing } from '../theme/spacing';
 import { ms, vs } from '../theme/responsive';
 import { hapticLight } from '../utils/haptics';
 import { useCreditStore } from '../stores/useCreditStore';
 import { AppText } from '../components/AppText';
-
-const { width: SCREEN_W } = Dimensions.get('window');
 
 const TAB_ICONS: Record<string, { active: string; inactive: string }> = {
   Dashboard:        { active: 'view-dashboard',  inactive: 'view-dashboard-outline' },
@@ -36,55 +34,32 @@ const TAB_LABELS: Record<string, string> = {
   BuyCredits:       'Credits',
 };
 
-const UNDERLINE_WIDTH = ms(28);
-const UNDERLINE_HEIGHT = vs(3);
+const BAR_HEIGHT = vs(62);
+const ELEVATED_SIZE = ms(56);
+const ELEVATED_LIFT = ms(7);
 
 export const CustomTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, navigation }) => {
   const insets = useSafeAreaInsets();
   const balance = useCreditStore((s) => s.balance);
 
-  const tabCount = state.routes.length;
-  const tabWidth = SCREEN_W / tabCount;
-
-  // Sliding underline
-  const underlineX = useSharedValue(
-    state.index * tabWidth + (tabWidth - UNDERLINE_WIDTH) / 2,
-  );
-
-  useEffect(() => {
-    underlineX.value = withSpring(
-      state.index * tabWidth + (tabWidth - UNDERLINE_WIDTH) / 2,
-      { damping: 18, stiffness: 220, mass: 0.7 },
-    );
-  }, [state.index, tabWidth]);
-
-  const underlineStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: underlineX.value }],
-  }));
+  const centerIndex = Math.floor(state.routes.length / 2);
 
   return (
-    <View style={[styles.wrap, { paddingBottom: insets.bottom, height: vs(60) + insets.bottom }]}>
-      {/* Top hairline */}
-      <View style={styles.hairline} />
-
-      {/* Sliding gold underline (under whichever tab is active) */}
-      <Animated.View style={[styles.underline, underlineStyle]}>
-        <LinearGradient
-          colors={gradients.premium}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.underlineFill}
-        />
-      </Animated.View>
-
-      {/* Tab cells */}
-      <View style={styles.tabsRow}>
+    <View
+      style={[
+        styles.outer,
+        { paddingBottom: Math.max(insets.bottom, vs(10)) },
+      ]}
+      pointerEvents="box-none"
+    >
+      <View style={styles.bar}>
         {state.routes.map((route, index) => {
           const focused = state.index === index;
           const icons = TAB_ICONS[route.name];
           const iconName = focused ? icons?.active : icons?.inactive;
           const label = TAB_LABELS[route.name] ?? route.name;
           const showBadge = route.name === 'BuyCredits' && balance > 0;
+          const isCenter = index === centerIndex;
 
           const onPress = () => {
             const event = navigation.emit({
@@ -107,7 +82,7 @@ export const CustomTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, 
               onPress={onPress}
               showBadge={showBadge}
               badgeValue={balance}
-              width={tabWidth}
+              isCenter={isCenter}
             />
           );
         })}
@@ -123,11 +98,11 @@ interface CellProps {
   onPress: () => void;
   showBadge: boolean;
   badgeValue: number;
-  width: number;
+  isCenter: boolean;
 }
 
 const TabCell: React.FC<CellProps> = ({
-  focused, iconName, label, onPress, showBadge, badgeValue, width,
+  focused, iconName, label, onPress, showBadge, badgeValue, isCenter,
 }) => {
   const iconScale = useSharedValue(focused ? 1.1 : 1);
 
@@ -146,11 +121,35 @@ const TabCell: React.FC<CellProps> = ({
     transform: [{ scale: iconScale.value }],
   }));
 
+  if (isCenter) {
+    return (
+      <TouchableOpacity
+        onPress={onPress}
+        activeOpacity={0.85}
+        style={styles.cellCenter}
+      >
+        <Animated.View style={[styles.elevatedBubble, iconStyle]}>
+          <LinearGradient
+            colors={gradients.premium}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+          <MaterialCommunityIcons
+            name={iconName}
+            size={ms(26)}
+            color={colors.white}
+          />
+        </Animated.View>
+      </TouchableOpacity>
+    );
+  }
+
   return (
     <TouchableOpacity
       onPress={onPress}
       activeOpacity={0.7}
-      style={[styles.cell, { width }]}
+      style={styles.cell}
     >
       <View style={styles.iconWrap}>
         <Animated.View style={iconStyle}>
@@ -185,41 +184,56 @@ const TabCell: React.FC<CellProps> = ({
 };
 
 const styles = StyleSheet.create({
-  wrap: {
+  outer: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: vs(8),
+    backgroundColor: 'transparent',
+  },
+  bar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: BAR_HEIGHT,
     backgroundColor: colors.card,
-    paddingTop: vs(6),
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.sm,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
     ...shadow.tabBar,
   },
-  hairline: {
-    position: 'absolute',
-    top: 0, left: 0, right: 0,
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: colors.border,
-  },
-  underline: {
-    position: 'absolute',
-    top: vs(6),
-    width: UNDERLINE_WIDTH,
-    height: UNDERLINE_HEIGHT,
-    borderRadius: radius.pill,
-    overflow: 'hidden',
-    ...shadow.sm,
-    shadowColor: colors.premium,
-  },
-  underlineFill: { flex: 1 },
 
-  tabsRow: { flexDirection: 'row' },
   cell: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingTop: vs(8),
-    paddingBottom: vs(4),
-    gap: vs(4),
+    gap: vs(3),
+    paddingVertical: vs(6),
   },
+  cellCenter: {
+    flex: 1,
+    height: BAR_HEIGHT,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  elevatedBubble: {
+    marginTop: -ELEVATED_LIFT,
+    width: ELEVATED_SIZE,
+    height: ELEVATED_SIZE,
+    borderRadius: ELEVATED_SIZE / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    borderWidth: ms(3),
+    borderColor: colors.card,
+    ...shadow.lg,
+    shadowColor: colors.premium,
+  },
+
   iconWrap: { position: 'relative' },
   label: {
     fontWeight: '600',
     letterSpacing: ms(0.2),
+    fontSize: ms(10),
   },
   labelActive: {
     fontWeight: '700',

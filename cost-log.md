@@ -10,10 +10,10 @@
 
 | Day | Date | Spend | vs Soft Cap | vs Hard Cap | Status |
 |-----|------|-------|-------------|-------------|--------|
-| Day 1 | 2026-05-07 | $— | — | — | In progress |
-| Day 2 | 2026-05-08 | $— | — | — | Not started |
-| Day 3 | 2026-05-09 | $— | — | — | Not started |
-| **Total** | | **$—** | | | |
+| Day 1 | 2026-05-07 | ~$2.26 | 3.0% | 2.3% | ✅ Complete |
+| Day 2 | 2026-05-08 | ~$1.28 | 1.7% | 1.3% | ✅ Complete |
+| Day 3 | 2026-05-09 | ~$0.92 | 1.2% | 0.9% | ✅ Complete |
+| **Total** | May 7 → 9 | **~$4.46** | **2.0%** of 3-day cap | **1.5%** of 3-day cap | Well under budget |
 
 ---
 
@@ -49,8 +49,14 @@
 
 | # | Model | Task Description | Est. Tokens | Est. Cost |
 |---|-------|-----------------|-------------|-----------|
-| — | — | *(to be filled during Day 2)* | — | — |
-| | | **Day 2 Total** | | **$—** |
+| 1 | Sonnet | Feature folder restructure + barrel index files + alias migration | ~10,000 | ~$0.10 |
+| 2 | Sonnet | Replace mocks with live market APIs across dashboard sections | ~24,000 | ~$0.24 |
+| 3 | Sonnet | Real-Time Marketplace Intelligence integration (RapidAPI Amazon) — best sellers, search, deals | ~24,000 | ~$0.24 |
+| 4 | Sonnet | Generative Insights Engine (Gemini 2.0 Flash) — AI ad copy + insights | ~14,000 | ~$0.14 |
+| 5 | Sonnet | Real-market dashboard upgrade merge + integration testing | ~18,000 | ~$0.18 |
+| 6 | Sonnet | iOS UI polish + dashboard UI refinements | ~24,000 | ~$0.24 |
+| 7 | Sonnet | Repo hygiene, TypeScript fixes, theme audits | ~14,000 | ~$0.14 |
+| | | **Day 2 Total** | **~128,000** | **~$1.28** |
 
 ---
 
@@ -58,8 +64,13 @@
 
 | # | Model | Task Description | Est. Tokens | Est. Cost |
 |---|-------|-----------------|-------------|-----------|
-| — | — | *(to be filled during Day 3)* | — | — |
-| | | **Day 3 Total** | | **$—** |
+| 1 | Sonnet | Buy-Credit purchase model (pack tiers, USDC pricing, mock/live PaymentService toggle) | ~16,000 | ~$0.16 |
+| 2 | Sonnet | Sparklines (7-day price/score trend on product cards) | ~10,000 | ~$0.10 |
+| 3 | Sonnet | Base Network Toggle (wagmi config: Sepolia ↔ Mainnet) | ~12,000 | ~$0.12 |
+| 4 | Sonnet | Navigation bar elevation + drawer/tab polish | ~6,000 | ~$0.06 |
+| 5 | Sonnet | Notion documentation: 11-chapter research brief + 9 Mermaid diagrams | ~36,000 | ~$0.36 |
+| 6 | Sonnet | Cost log entries + misc clean-up | ~12,000 | ~$0.12 |
+| | | **Day 3 Total** | **~92,000** | **~$0.92** |
 
 ---
 

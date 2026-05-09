@@ -8,12 +8,13 @@ import Animated, {
   withTiming,
   useAnimatedStyle,
 } from 'react-native-reanimated';
-import { isDemoPaymentMode } from '../services/paymentService';
+import { useSettingsStore } from '../stores/useSettingsStore';
 import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
 import { ms, vs } from '../theme/responsive';
 
 export const DemoModeBanner: React.FC = () => {
+  const paymentMode = useSettingsStore((s) => s.paymentMode);
   const dotOpacity = useSharedValue(1);
 
   useEffect(() => {
@@ -25,7 +26,7 @@ export const DemoModeBanner: React.FC = () => {
 
   const dotStyle = useAnimatedStyle(() => ({ opacity: dotOpacity.value }));
 
-  if (!isDemoPaymentMode()) return null;
+  if (paymentMode !== 'mock') return null;
 
   return (
     <View style={styles.banner}>

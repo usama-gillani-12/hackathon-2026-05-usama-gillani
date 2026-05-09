@@ -8,7 +8,6 @@ import { DrawerScreenProps } from '@react-navigation/drawer';
 import { DrawerParamList } from '../types/navigation';
 import { isYoutubeKeyConfigured } from '../api/youtubeApi';
 import { clearTransactions, resetCredits } from '../services/creditService';
-import { isDemoPaymentMode } from '../services/paymentService';
 import {
   clearProductCache, loadScoredProducts, probeProductSources, ProductSourceStatus,
 } from '../services/productService';
@@ -29,6 +28,8 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
   const [status, setStatus] = useState<ProductSourceStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const resetOnboarding = useSettingsStore((s) => s.resetOnboarding);
+  const paymentMode = useSettingsStore((s) => s.paymentMode);
+  const isDemoMode = paymentMode === 'mock';
 
   const refresh = useCallback(async () => {
     const stored = await readJson<{ mockApiMode: boolean }>(StorageKeys.Settings, { mockApiMode: false });
@@ -115,10 +116,10 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
           <Divider style={styles.divider} />
           <View style={styles.statusRow}>
             <Text style={styles.statusLabel}>Payment Mode</Text>
-            <View style={[styles.statusPill, { backgroundColor: isDemoPaymentMode() ? colors.warningSoft : colors.successSoft }]}>
-              <View style={[styles.dot, { backgroundColor: isDemoPaymentMode() ? colors.warning : colors.success }]} />
-              <Text style={[styles.statusVal, { color: isDemoPaymentMode() ? colors.warning : colors.success }]}>
-                {isDemoPaymentMode() ? 'Mock / Demo' : 'Live'}
+            <View style={[styles.statusPill, { backgroundColor: isDemoMode ? colors.warningSoft : colors.successSoft }]}>
+              <View style={[styles.dot, { backgroundColor: isDemoMode ? colors.warning : colors.success }]} />
+              <Text style={[styles.statusVal, { color: isDemoMode ? colors.warning : colors.success }]}>
+                {isDemoMode ? 'Mock / Demo' : 'Live'}
               </Text>
             </View>
           </View>

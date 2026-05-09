@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { StatusBar } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -12,20 +12,10 @@ import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { paperTheme } from './src/theme/paperTheme';
 import { wagmiConfig } from './src/config/wagmi';
 import { BaseSepoliaPaymentService, MockPaymentService, setPaymentService } from './src/services/paymentService';
+import { useSettingsStore } from './src/stores/useSettingsStore';
 
-// ────────────────────────────────────────────────────────────────────────────
-// PAYMENT MODE — flip this one constant to switch between simulator-friendly
-// mock payments and real Base Sepolia USDC on a physical device.
-//
-//   true  → Mock service (no wallet needed, works on simulator)
-//   false → Real Base Sepolia USDC (needs MetaMask + testnet USDC + device)
-// ────────────────────────────────────────────────────────────────────────────
-const USE_MOCK_PAYMENT = true;
-
-setPaymentService(USE_MOCK_PAYMENT ? MockPaymentService : BaseSepoliaPaymentService);
-if (__DEV__) {
-  console.log('[Payment] mode =', USE_MOCK_PAYMENT ? 'mock' : 'testnet');
-}
+// Safe synchronous default before the persisted store hydrates.
+setPaymentService(MockPaymentService);
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -38,6 +28,17 @@ const queryClient = new QueryClient({
 });
 
 export default function App() {
+  const paymentMode = useSettingsStore((s) => s.paymentMode);
+  const hydrated = useSettingsStore((s) => s.hydrated);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    setPaymentService(paymentMode === 'mock' ? MockPaymentService : BaseSepoliaPaymentService);
+    if (__DEV__) {
+      console.log('[Payment] mode =', paymentMode);
+    }
+  }, [paymentMode, hydrated]);
+
   return (
     <WagmiProvider config={wagmiConfig}>
       <GestureHandlerRootView style={{ flex: 1 }}>

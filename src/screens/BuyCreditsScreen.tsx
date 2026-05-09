@@ -16,6 +16,7 @@ import { useAccount } from 'wagmi';
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { CREDIT_PACKAGES, getCreditBalance, getTotalCredits } from '../services/creditService';
 import { getPaymentService } from '../services/paymentService';
+import { useSettingsStore } from '../stores/useSettingsStore';
 import { colors, gradients } from '../theme/colors';
 import { radius, spacing } from '../theme/spacing';
 import { ms, s, vs } from '../theme/responsive';
@@ -114,7 +115,7 @@ export const BuyCreditsScreen: React.FC<Props> = () => {
 
   const selectedPkg = CREDIT_PACKAGES.find((p) => p.id === selectedId);
   const roi = ROI_EXAMPLES[roiIndex];
-  const isTestnet = getPaymentService().mode === 'testnet';
+  const isTestnet = useSettingsStore((s) => s.paymentMode) === 'testnet';
   const payEnabled = isTestnet ? (isConnected && !processing) : !processing;
 
   return (

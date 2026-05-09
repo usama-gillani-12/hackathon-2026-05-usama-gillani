@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { DrawerContentScrollView } from '@react-navigation/drawer';
 import { Text } from 'react-native-paper';
@@ -6,12 +6,19 @@ import { LinearGradient } from 'react-native-linear-gradient';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DrawerContentComponentProps } from '@react-navigation/drawer';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  Easing,
+} from 'react-native-reanimated';
 
 import { colors, withOpacity } from '../../theme/colors';
 import { ms, s, vs } from '../../theme/responsive';
 import { useCreditStore } from '../../stores/useCreditStore';
 import { useNotificationStore } from '../../stores/useNotificationStore';
 import { useAuthStore } from '../../stores/useAuthStore';
+import { useSettingsStore } from '../../stores/useSettingsStore';
 
 interface DrawerItem {
   label: string;
@@ -38,6 +45,9 @@ const BOTTOM_ITEMS: DrawerItem[] = [
   { label: 'Transactions', icon: 'receipt', route: 'TransactionHistory' },
 ];
 
+// Width of each segment — half the track. Used to calculate thumb translateX.
+const SEGMENT_WIDTH = s(70);
+
 const TAB_ROUTE_MAP: Record<string, string> = {
   'Home': 'Dashboard',
   'Trending Products': 'TrendingProducts',
@@ -51,7 +61,41 @@ export const CustomDrawerContent: React.FC<DrawerContentComponentProps> = (props
   const balance = useCreditStore((s) => s.balance);
   const unreadCount = useNotificationStore((s) => s.notifications.filter((n) => !n.read).length);
   const { user, signOut } = useAuthStore();
+  const paymentMode = useSettingsStore((st) => st.paymentMode);
+  const setPaymentMode = useSettingsStore((st) => st.setPaymentMode);
   const [signingOut, setSigningOut] = useState(false);
+
+  const isTestnet = paymentMode === 'testnet';
+
+  // Segmented control thumb: 0 = Demo (left), 1 = Testnet (right)
+  const thumbPos = useSharedValue(isTestnet ? 1 : 0);
+
+  useEffect(() => {
+    thumbPos.value = withTiming(isTestnet ? 1 : 0, {
+      duration: 220,
+      easing: Easing.out(Easing.cubic),
+    });
+  }, [isTestnet]);
+
+  const thumbStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: thumbPos.value * SEGMENT_WIDTH }],
+  }));
+
+  const selectDemo = () => {
+    if (paymentMode !== 'mock') setPaymentMode('mock');
+  };
+
+  const selectTestnet = () => {
+    if (paymentMode === 'testnet') return;
+    Alert.alert(
+      'Switch to Base Sepolia?',
+      "You'll need a connected wallet with testnet USDC to purchase credits.",
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Switch', onPress: () => setPaymentMode('testnet') },
+      ],
+    );
+  };
 
   const currentRouteName = state.routes[state.index]?.name;
 
@@ -199,11 +243,38 @@ export const CustomDrawerContent: React.FC<DrawerContentComponentProps> = (props
             </Text>
           </TouchableOpacity>
         </View>
-        <View style={styles.footerBottom}>
-          <View style={styles.demoTag}>
-            <View style={styles.demoDot} />
-            <Text style={styles.demoText}>DEMO MODE</Text>
+        {/* Network mode segmented control */}
+        <View style={styles.networkRow}>
+          <Text style={styles.networkLabel}>NETWORK</Text>
+          <View style={styles.segmentTrack}>
+            {/* Sliding thumb */}
+            <Animated.View style={[styles.segmentThumb, isTestnet ? styles.segmentThumbTestnet : styles.segmentThumbDemo, thumbStyle]} />
+            {/* Demo segment */}
+            <TouchableOpacity style={styles.segment} onPress={selectDemo} activeOpacity={0.8}>
+              <MaterialCommunityIcons
+                name="flask-outline"
+                size={ms(13)}
+                color={!isTestnet ? colors.heroDark : 'rgba(255,255,255,0.45)'}
+              />
+              <Text style={[styles.segmentLabel, !isTestnet && styles.segmentLabelActive]}>
+                Demo
+              </Text>
+            </TouchableOpacity>
+            {/* Testnet segment */}
+            <TouchableOpacity style={styles.segment} onPress={selectTestnet} activeOpacity={0.8}>
+              <MaterialCommunityIcons
+                name="ethereum"
+                size={ms(13)}
+                color={isTestnet ? colors.heroDark : 'rgba(255,255,255,0.45)'}
+              />
+              <Text style={[styles.segmentLabel, isTestnet && styles.segmentLabelActiveTestnet]}>
+                Sepolia
+              </Text>
+            </TouchableOpacity>
           </View>
+        </View>
+
+        <View style={styles.footerBottom}>
           <Text style={styles.versionText}>v1.0.0</Text>
         </View>
       </View>
@@ -359,11 +430,6 @@ const styles = StyleSheet.create({
   footerTop: {
     marginBottom: vs(12),
   },
-  footerBottom: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
   logoutBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -380,22 +446,64 @@ const styles = StyleSheet.create({
     fontSize: ms(14),
     fontWeight: '600',
   },
-  demoTag: {
+  networkRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: ms(6),
+    justifyContent: 'space-between',
+    marginBottom: vs(10),
   },
-  demoDot: {
-    width: ms(7),
-    height: ms(7),
-    borderRadius: ms(4),
+  networkLabel: {
+    color: 'rgba(255,255,255,0.35)',
+    fontSize: ms(10),
+    fontWeight: '700',
+    letterSpacing: ms(1.2),
+  },
+  segmentTrack: {
+    flexDirection: 'row',
+    width: SEGMENT_WIDTH * 2,
+    height: vs(30),
+    borderRadius: ms(8),
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  segmentThumb: {
+    position: 'absolute',
+    width: SEGMENT_WIDTH,
+    height: '100%',
+    borderRadius: ms(7),
+  },
+  segmentThumbDemo: {
     backgroundColor: colors.premium,
   },
-  demoText: {
-    color: 'rgba(255,255,255,0.4)',
+  segmentThumbTestnet: {
+    backgroundColor: colors.accent,
+  },
+  segment: {
+    width: SEGMENT_WIDTH,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: ms(4),
+    zIndex: 1,
+  },
+  segmentLabel: {
     fontSize: ms(11),
     fontWeight: '700',
-    letterSpacing: ms(1),
+    color: 'rgba(255,255,255,0.45)',
+  },
+  segmentLabelActive: {
+    color: colors.heroDark,
+  },
+  segmentLabelActiveTestnet: {
+    color: colors.heroDark,
+  },
+  footerBottom: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
   },
   versionText: {
     color: 'rgba(255,255,255,0.25)',

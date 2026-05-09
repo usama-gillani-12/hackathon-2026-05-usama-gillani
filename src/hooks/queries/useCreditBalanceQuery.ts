@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { getCreditBalance } from '../../services/creditService';
+import { getCreditBalance } from '@core/services/creditService';
 import { queryKeys } from './keys';
 
 export const useCreditBalanceQuery = () =>

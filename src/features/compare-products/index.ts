@@ -1,0 +1,1 @@
+export { CompareProductsScreen } from './CompareProductsScreen';

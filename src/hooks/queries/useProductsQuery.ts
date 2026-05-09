@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { loadScoredProducts } from '../../services/productService';
+import { loadScoredProducts } from '@core/services/productService';
 import { queryKeys } from './keys';
 
 export const useProductsQuery = () =>

@@ -1,4 +1,4 @@
-import { Product } from '../types/product';
+import { Product } from '@t/product';
 
 // These hand-tuned products guarantee a polished hackathon demo even when APIs are offline.
 // Several are tuned to land at 9/10 or 10/10 so the premium-unlock flow always has live targets.

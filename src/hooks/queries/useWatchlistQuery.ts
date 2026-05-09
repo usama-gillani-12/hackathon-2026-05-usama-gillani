@@ -4,8 +4,8 @@ import {
   addToWatchlist,
   removeFromWatchlist,
   setWatchlistStatus,
-} from '../../services/watchlistService';
-import { WatchlistStatus } from '../../types/product';
+} from '@core/services/watchlistService';
+import { WatchlistStatus } from '@t/product';
 import { queryKeys } from './keys';
 
 export const useWatchlistQuery = () =>

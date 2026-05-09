@@ -17,7 +17,15 @@
     "rootDir": ".",
     "outDir": "dist",
     "paths": {
-      "@/*": ["src/*"]
+      "@features/*": ["src/features/*"],
+      "@shared/*": ["src/shared/*"],
+      "@core/*": ["src/core/*"],
+      "@theme/*": ["src/theme/*"],
+      "@utils/*": ["src/utils/*"],
+      "@hooks/*": ["src/hooks/*"],
+      "@mocks/*": ["src/mocks/*"],
+      "@constants": ["src/constants/index.ts"],
+      "@t/*": ["src/types/*"]
     }
   },
   "include": ["**/*.ts", "**/*.tsx"],

@@ -1,0 +1,1 @@
+export { SparklineSvg } from './SparklineSvg';

@@ -1,5 +1,5 @@
-import { Product } from '../types/product';
-import type { AmazonRawProduct } from '../api/amazonApi';
+import { Product } from '@t/product';
+import type { AmazonRawProduct } from '@core/api/amazonApi';
 
 interface DummyJsonProduct {
   id: number;

@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getUnlockedIdSet, unlockProduct } from '../../services/unlockService';
+import { getUnlockedIdSet, unlockProduct } from '@core/services/unlockService';
 import { queryKeys } from './keys';
 
 export const useUnlockedQuery = () =>

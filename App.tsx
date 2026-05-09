@@ -6,13 +6,15 @@ import { PaperProvider } from 'react-native-paper';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { WagmiProvider } from 'wagmi';
 import { Web3Modal } from '@web3modal/wagmi-react-native';
+import { PostHogProvider } from 'posthog-react-native';
+import { posthog } from '@core/lib/posthog';
 
-import { AppNavigator } from './src/navigation/AppNavigator';
-import { ErrorBoundary } from './src/components/ErrorBoundary';
-import { paperTheme } from './src/theme/paperTheme';
-import { wagmiConfig } from './src/config/wagmi';
-import { BaseSepoliaPaymentService, MockPaymentService, setPaymentService } from './src/services/paymentService';
-import { useSettingsStore } from './src/stores/useSettingsStore';
+import { AppNavigator } from '@core/navigation/AppNavigator';
+import { ErrorBoundary } from '@shared/components/error-boundary';
+import { paperTheme } from '@theme/paperTheme';
+import { wagmiConfig } from '@core/config/wagmi';
+import { BaseSepoliaPaymentService, MockPaymentService, setPaymentService } from '@core/services/paymentService';
+import { useSettingsStore } from '@core/stores/useSettingsStore';
 
 // Safe synchronous default before the persisted store hydrates.
 setPaymentService(MockPaymentService);
@@ -40,20 +42,22 @@ export default function App() {
   }, [paymentMode, hydrated]);
 
   return (
-    <WagmiProvider config={wagmiConfig}>
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <SafeAreaProvider>
-          <QueryClientProvider client={queryClient}>
-            <PaperProvider theme={paperTheme}>
-              <StatusBar barStyle="light-content" backgroundColor="#0B1220" />
-              <ErrorBoundary>
-                <AppNavigator />
-              </ErrorBoundary>
-              <Web3Modal />
-            </PaperProvider>
-          </QueryClientProvider>
-        </SafeAreaProvider>
-      </GestureHandlerRootView>
-    </WagmiProvider>
+    <PostHogProvider client={posthog} autocapture={false}>
+      <WagmiProvider config={wagmiConfig}>
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          <SafeAreaProvider>
+            <QueryClientProvider client={queryClient}>
+              <PaperProvider theme={paperTheme}>
+                <StatusBar barStyle="light-content" backgroundColor="#0B1220" />
+                <ErrorBoundary>
+                  <AppNavigator />
+                </ErrorBoundary>
+                <Web3Modal />
+              </PaperProvider>
+            </QueryClientProvider>
+          </SafeAreaProvider>
+        </GestureHandlerRootView>
+      </WagmiProvider>
+    </PostHogProvider>
   );
 }

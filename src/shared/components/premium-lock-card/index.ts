@@ -1,0 +1,1 @@
+export { PremiumLockCard } from './PremiumLockCard';

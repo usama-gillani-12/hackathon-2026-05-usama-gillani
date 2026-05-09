@@ -1,0 +1,1 @@
+export { TranslucentHeader } from './TranslucentHeader';

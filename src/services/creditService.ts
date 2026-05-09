@@ -1,11 +1,83 @@
-import { CreditPackage, CreditTransaction } from '../types/credits';
+import { ChainVolumeSnapshot, CreditPackage, CreditTransaction, SubscriptionPass } from '../types/credits';
 import { readJson, StorageKeys, writeJson } from './storageService';
 
+// Investor-grade tiered pricing: bulk bonuses drive LTV, sub-$30/$70 anchors drive conversions
 export const CREDIT_PACKAGES: CreditPackage[] = [
-  { id: 'pkg-5', credits: 5, usdcAmount: 5, label: 'Starter' },
-  { id: 'pkg-15', credits: 15, usdcAmount: 15, label: 'Pro', highlight: true },
-  { id: 'pkg-50', credits: 50, usdcAmount: 50, label: 'Studio' },
+  {
+    id: 'pkg-starter',
+    credits: 5,
+    bonusCredits: 0,
+    usdcAmount: 4,
+    label: 'Starter',
+    savingsPercent: 0,
+    expiryDays: 30,
+  },
+  {
+    id: 'pkg-growth',
+    credits: 15,
+    bonusCredits: 3,
+    usdcAmount: 12,
+    label: 'Growth',
+    highlight: true,
+    badgeText: 'MOST POPULAR',
+    savingsPercent: 20,
+    expiryDays: 60,
+  },
+  {
+    id: 'pkg-pro',
+    credits: 40,
+    bonusCredits: 10,
+    usdcAmount: 29,
+    label: 'Pro',
+    badgeText: 'BEST VALUE',
+    savingsPercent: 42,
+    expiryDays: 90,
+  },
+  {
+    id: 'pkg-studio',
+    credits: 100,
+    bonusCredits: 30,
+    usdcAmount: 69,
+    label: 'Studio',
+    badgeText: 'POWER USER',
+    savingsPercent: 55,
+    expiryDays: 180,
+  },
 ];
+
+export const SUBSCRIPTION_PASS: SubscriptionPass = {
+  id: 'sub-monthly',
+  label: 'Monthly Pass',
+  creditsPerMonth: 25,
+  usdcPerMonth: 19,
+  perks: [
+    'New credits auto-loaded monthly',
+    'Never lose unused credits',
+    'Priority product data refresh',
+    '20% off one-time top-ups',
+  ],
+};
+
+export function getTotalCredits(pkg: CreditPackage): number {
+  return pkg.credits + (pkg.bonusCredits ?? 0);
+}
+
+export async function getChainVolume(): Promise<ChainVolumeSnapshot> {
+  return readJson<ChainVolumeSnapshot>(StorageKeys.ChainVolume, {
+    totalUsdcVolume: 0,
+    totalTransactions: 0,
+    snapshotAt: Date.now(),
+  });
+}
+
+export async function incrementChainVolume(usdcAmount: number): Promise<void> {
+  const existing = await getChainVolume();
+  await writeJson(StorageKeys.ChainVolume, {
+    totalUsdcVolume: existing.totalUsdcVolume + usdcAmount,
+    totalTransactions: existing.totalTransactions + 1,
+    snapshotAt: Date.now(),
+  });
+}
 
 const STARTING_CREDITS = 2; // Give merchants a tiny taste so they can experience an unlock without paying first.
 
@@ -63,4 +135,15 @@ export async function clearTransactions(): Promise<void> {
 
 export function getPackageById(id: string): CreditPackage | undefined {
   return CREDIT_PACKAGES.find((p) => p.id === id);
+}
+
+// Legacy aliases so any stored packageId like 'pkg-5' still resolves gracefully
+const LEGACY_ID_MAP: Record<string, string> = {
+  'pkg-5': 'pkg-starter',
+  'pkg-15': 'pkg-growth',
+  'pkg-50': 'pkg-pro',
+};
+
+export function resolvePackageId(id: string): CreditPackage | undefined {
+  return getPackageById(LEGACY_ID_MAP[id] ?? id);
 }

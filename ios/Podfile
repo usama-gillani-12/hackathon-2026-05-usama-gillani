@@ -1,6 +1,6 @@
 require File.join(File.dirname(`node --print "require.resolve('react-native/package.json')"`), "scripts/react_native_pods")
 
-platform :ios, '13.4'
+platform :ios, '14.0'
 install! 'cocoapods', :deterministic_uuids => false
 
 prepare_react_native_project!

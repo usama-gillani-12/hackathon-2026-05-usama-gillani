@@ -4,6 +4,25 @@ export interface CreditPackage {
   usdcAmount: number;
   label: string;
   highlight?: boolean;
+  bonusCredits?: number;
+  badgeText?: string;
+  savingsPercent?: number;
+  expiryDays?: number;
+  isSubscription?: boolean;
+}
+
+export interface SubscriptionPass {
+  id: string;
+  label: string;
+  creditsPerMonth: number;
+  usdcPerMonth: number;
+  perks: string[];
+}
+
+export interface ChainVolumeSnapshot {
+  totalUsdcVolume: number;
+  totalTransactions: number;
+  snapshotAt: number;
 }
 
 export type TransactionStatus = 'pending' | 'confirmed' | 'failed';
@@ -22,7 +41,7 @@ export interface CreditTransaction {
   createdAt: number;
   productId?: string;
   productTitle?: string;
-  network: 'mock' | 'testnet' | 'mainnet';
+  network: 'mock' | 'testnet' | 'mainnet' | 'base-sepolia';
 }
 
 export interface UnlockRecord {
@@ -37,7 +56,7 @@ export interface UsdcPaymentIntent {
   packageId: string;
   usdcAmount: number;
   credits: number;
-  network: 'mock' | 'testnet' | 'mainnet';
+  network: 'mock' | 'testnet' | 'mainnet' | 'base-sepolia';
   receivingAddress: string;
   expiresAt: number;
 }

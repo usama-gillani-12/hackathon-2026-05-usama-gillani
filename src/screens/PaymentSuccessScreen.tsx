@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { Linking, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Text, Surface, Button, Divider } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'react-native-linear-gradient';
@@ -76,6 +76,17 @@ export const PaymentSuccessScreen: React.FC<Props> = ({ navigation, route }) => 
           <View style={styles.hashWrap}>
             <Text style={styles.hashLabel}>TRANSACTION HASH</Text>
             <Text style={styles.hashValue}>{shortenHash(transaction.txHash, 14, 10)}</Text>
+            {transaction.network === 'base-sepolia' && (
+              <TouchableOpacity
+                onPress={() =>
+                  Linking.openURL(`https://sepolia.basescan.org/tx/${transaction.txHash}`)
+                }
+                style={styles.explorerLink}
+              >
+                <MaterialCommunityIcons name="open-in-new" size={ms(13)} color={colors.accent} />
+                <Text style={styles.explorerText}>View on Base Sepolia Explorer</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </Surface>
 
@@ -104,6 +115,14 @@ export const PaymentSuccessScreen: React.FC<Props> = ({ navigation, route }) => 
           <View style={styles.demoNote}>
             <MaterialCommunityIcons name="information-outline" size={ms(14)} color={colors.premium} />
             <Text style={styles.demoNoteText}>Demo mode · No real funds were moved.</Text>
+          </View>
+        )}
+        {transaction.network === 'base-sepolia' && (
+          <View style={[styles.demoNote, styles.testnetNote]}>
+            <MaterialCommunityIcons name="flask-outline" size={ms(14)} color={colors.success} />
+            <Text style={[styles.demoNoteText, { color: colors.success }]}>
+              Confirmed on Base Sepolia Testnet · No real funds used
+            </Text>
           </View>
         )}
       </ScrollView>
@@ -159,5 +178,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: ms(6),
     justifyContent: 'center', marginTop: spacing.md,
   },
+  testnetNote: { marginTop: spacing.xs },
   demoNoteText: { fontSize: ms(12), color: colors.premium },
+  explorerLink: {
+    flexDirection: 'row', alignItems: 'center', gap: ms(4), marginTop: vs(6),
+  },
+  explorerText: { fontSize: ms(12), color: colors.accent, fontWeight: '600' },
 });

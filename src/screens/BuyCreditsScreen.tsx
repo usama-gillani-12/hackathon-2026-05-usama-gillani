@@ -12,14 +12,17 @@ import Animated, {
 } from 'react-native-reanimated';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useAccount } from 'wagmi';
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
-import { CREDIT_PACKAGES, getCreditBalance } from '../services/creditService';
-import { getPaymentService, isDemoPaymentMode } from '../services/paymentService';
+import { CREDIT_PACKAGES, getCreditBalance, getTotalCredits } from '../services/creditService';
+import { getPaymentService } from '../services/paymentService';
 import { colors, gradients } from '../theme/colors';
 import { radius, spacing } from '../theme/spacing';
 import { ms, s, vs } from '../theme/responsive';
 import { CreditPackage } from '../types/credits';
 import { BottomTabParamList } from '../types/navigation';
+import { WalletConnectButton } from '../components/WalletConnectButton';
+import { SubscriptionPassCard } from '../components/SubscriptionPassCard';
 
 type Props = BottomTabScreenProps<BottomTabParamList, 'BuyCredits'>;
 
@@ -31,17 +34,19 @@ const VALUE_PROPS = [
 ];
 
 const ROI_EXAMPLES = [
-  { product: 'LED Face Mask', investment: '$15', revenue: '$8,400/mo', margin: '72%' },
-  { product: 'Pet Water Fountain', investment: '$9', revenue: '$4,200/mo', margin: '65%' },
-  { product: 'Posture Corrector', investment: '$3', revenue: '$2,800/mo', margin: '58%' },
+  { product: 'LED Face Mask', investment: '$12', revenue: '$8,400/mo', margin: '72%' },
+  { product: 'Pet Water Fountain', investment: '$12', revenue: '$4,200/mo', margin: '65%' },
+  { product: 'Posture Corrector', investment: '$4', revenue: '$2,800/mo', margin: '58%' },
 ];
 
 export const BuyCreditsScreen: React.FC<Props> = () => {
   const navigation = useNavigation<any>();
+  const { isConnected } = useAccount();
   const [balance, setBalance] = useState(0);
   const [selectedId, setSelectedId] = useState<string>(CREDIT_PACKAGES[1]?.id ?? CREDIT_PACKAGES[0]?.id);
   const [processing, setProcessing] = useState(false);
   const [roiIndex, setRoiIndex] = useState(0);
+  const [tabIndex, setTabIndex] = useState(0); // 0 = packages, 1 = subscription
 
   const pulseOpacity = useSharedValue(1);
   const pulseStyle = useAnimatedStyle(() => ({ opacity: pulseOpacity.value }));
@@ -84,8 +89,33 @@ export const BuyCreditsScreen: React.FC<Props> = () => {
     }
   };
 
+  const onSubscribe = async () => {
+    // Subscription uses the same payment flow with a dedicated package object
+    const subPkg: CreditPackage = {
+      id: 'sub-monthly',
+      credits: 25,
+      usdcAmount: 19,
+      label: 'Monthly Pass',
+      isSubscription: true,
+    };
+    setProcessing(true);
+    startPulse();
+    try {
+      const service = getPaymentService();
+      const intent = await service.createUsdcPaymentIntent(subPkg);
+      const result = await service.verifyUsdcPayment(intent.intentId);
+      const tx = await service.addCredits(subPkg, result);
+      navigation.navigate('PaymentSuccess', { transaction: tx, packageInfo: subPkg });
+    } finally {
+      setProcessing(false);
+      stopPulse();
+    }
+  };
+
   const selectedPkg = CREDIT_PACKAGES.find((p) => p.id === selectedId);
   const roi = ROI_EXAMPLES[roiIndex];
+  const isTestnet = getPaymentService().mode === 'testnet';
+  const payEnabled = isTestnet ? (isConnected && !processing) : !processing;
 
   return (
     <SafeAreaView style={styles.safe} edges={[]}>
@@ -110,7 +140,12 @@ export const BuyCreditsScreen: React.FC<Props> = () => {
             </TouchableOpacity>
           </View>
 
-          {isDemoPaymentMode() && (
+          {isTestnet ? (
+            <View style={styles.testnetBadge}>
+              <View style={styles.testnetDot} />
+              <Text style={styles.testnetText}>BASE SEPOLIA TESTNET · Real wallet required</Text>
+            </View>
+          ) : (
             <View style={styles.demoBadge}>
               <View style={styles.demoDot} />
               <Text style={styles.demoText}>USDC DEMO MODE — No real funds required</Text>
@@ -161,47 +196,94 @@ export const BuyCreditsScreen: React.FC<Props> = () => {
           </Surface>
         </Animated.View>
 
-        {/* Packages */}
-        <Animated.View entering={FadeInDown.delay(150)} style={styles.section}>
-          <Text style={styles.sectionLabel}>CHOOSE A PACKAGE</Text>
-          <Text style={styles.sectionSub}>1 credit = 1 USDC · 3 credits unlock one premium product</Text>
-          {CREDIT_PACKAGES.map((pkg) => (
-            <PackageCard
-              key={pkg.id}
-              pkg={pkg}
-              selected={selectedId === pkg.id}
-              onPress={() => setSelectedId(pkg.id)}
-            />
-          ))}
+        {/* Tab switcher */}
+        <Animated.View entering={FadeInDown.delay(130)} style={styles.section}>
+          <View style={styles.tabSwitcher}>
+            <TouchableOpacity
+              onPress={() => setTabIndex(0)}
+              style={[styles.tab, tabIndex === 0 && styles.tabActive]}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.tabText, tabIndex === 0 && styles.tabTextActive]}>One-Time</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setTabIndex(1)}
+              style={[styles.tab, tabIndex === 1 && styles.tabActive]}
+              activeOpacity={0.8}
+            >
+              <MaterialCommunityIcons
+                name="crown"
+                size={ms(12)}
+                color={tabIndex === 1 ? colors.white : colors.muted}
+              />
+              <Text style={[styles.tabText, tabIndex === 1 && styles.tabTextActive]}>Monthly Pass</Text>
+            </TouchableOpacity>
+          </View>
         </Animated.View>
 
-        {/* Pay button */}
-        <Animated.View entering={FadeInDown.delay(200)} style={styles.section}>
-          <Animated.View style={[pulseStyle]}>
-            <TouchableOpacity onPress={onPay} disabled={processing} activeOpacity={0.85}>
-              <LinearGradient
-                colors={processing ? [colors.textDisabled, colors.textDisabled] : gradients.accent}
-                style={styles.payBtn}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-              >
-                {processing ? (
-                  <View style={styles.processingRow}>
-                    <PaperSpinner size={ms(18)} color={colors.white} />
-                    <Text style={styles.payBtnLabel}>Confirming on-chain…</Text>
-                  </View>
-                ) : (
-                  <View style={styles.payBtnContent}>
-                    <MaterialCommunityIcons name="lightning-bolt" size={ms(18)} color={colors.white} />
-                    <Text style={styles.payBtnLabel}>
-                      Pay {selectedPkg?.usdcAmount ?? 0} USDC · Get {selectedPkg?.credits ?? 0} Credits
-                    </Text>
-                  </View>
-                )}
-              </LinearGradient>
-            </TouchableOpacity>
+        {tabIndex === 0 ? (
+          <>
+            {/* Packages */}
+            <Animated.View entering={FadeInDown.delay(150)} style={styles.section}>
+              <Text style={styles.sectionLabel}>CHOOSE A PACKAGE</Text>
+              <Text style={styles.sectionSub}>Bulk tiers include bonus credits · Never pay full price</Text>
+              {CREDIT_PACKAGES.map((pkg) => (
+                <PackageCard
+                  key={pkg.id}
+                  pkg={pkg}
+                  selected={selectedId === pkg.id}
+                  onPress={() => setSelectedId(pkg.id)}
+                />
+              ))}
+            </Animated.View>
+
+            {/* Wallet connect + pay button */}
+            <Animated.View entering={FadeInDown.delay(200)} style={styles.section}>
+              {isTestnet && (
+                <>
+                  <WalletConnectButton />
+                  <View style={{ height: vs(12) }} />
+                </>
+              )}
+              <Animated.View style={[pulseStyle]}>
+                <TouchableOpacity onPress={onPay} disabled={!payEnabled} activeOpacity={0.85}>
+                  <LinearGradient
+                    colors={!payEnabled ? [colors.textDisabled, colors.textDisabled] : gradients.accent}
+                    style={styles.payBtn}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                  >
+                    {processing ? (
+                      <View style={styles.processingRow}>
+                        <PaperSpinner size={ms(18)} color={colors.white} />
+                        <Text style={styles.payBtnLabel}>Confirming on-chain…</Text>
+                      </View>
+                    ) : (
+                      <View style={styles.payBtnContent}>
+                        <MaterialCommunityIcons name="lightning-bolt" size={ms(18)} color={colors.white} />
+                        <Text style={styles.payBtnLabel}>
+                          {isTestnet && !isConnected
+                            ? 'Connect Wallet to Continue'
+                            : `Pay ${selectedPkg?.usdcAmount ?? 0} USDC · Get ${getTotalCredits(selectedPkg ?? CREDIT_PACKAGES[0])} Credits`}
+                        </Text>
+                      </View>
+                    )}
+                  </LinearGradient>
+                </TouchableOpacity>
+              </Animated.View>
+            </Animated.View>
+          </>
+        ) : (
+          <Animated.View entering={FadeInDown.delay(150)} style={styles.section}>
+            {isTestnet && (
+              <>
+                <WalletConnectButton />
+                <View style={{ height: vs(12) }} />
+              </>
+            )}
+            <SubscriptionPassCard onSubscribe={onSubscribe} processing={processing} />
           </Animated.View>
-        </Animated.View>
+        )}
 
         {/* Security section */}
         <Animated.View entering={FadeInDown.delay(250)} style={styles.section}>
@@ -211,9 +293,9 @@ export const BuyCreditsScreen: React.FC<Props> = () => {
               <Text style={styles.securityTitle}>Secure USDC Payment</Text>
             </View>
             {[
-              { icon: 'server-outline', text: 'Payment verified server-side — never on the client' },
-              { icon: 'key-outline', text: 'No private keys or seed phrases stored on device' },
-              { icon: 'lock-outline', text: 'End-to-end encrypted transaction flow' },
+              { icon: 'ethereum', text: 'Transaction verified on Base Sepolia blockchain' },
+              { icon: 'key-outline', text: 'Private keys stay in your wallet — never shared' },
+              { icon: 'lock-outline', text: 'WalletConnect secure relay — open standard' },
             ].map((b, i) => (
               <View key={i} style={styles.securityRow}>
                 <View style={styles.securityIcon}>
@@ -233,44 +315,56 @@ const PackageCard: React.FC<{ pkg: CreditPackage; selected: boolean; onPress: ()
   pkg,
   selected,
   onPress,
-}) => (
-  <TouchableOpacity onPress={onPress} activeOpacity={0.8} style={styles.packageWrap}>
-    <Surface
-      style={[styles.packageCard, selected && styles.packageCardSelected]}
-      elevation={selected ? 3 : 1}
-    >
-      {selected && (
-        <View style={styles.checkMark}>
-          <MaterialCommunityIcons name="check-circle" size={ms(22)} color={colors.accent} />
+}) => {
+  const total = getTotalCredits(pkg);
+  return (
+    <TouchableOpacity onPress={onPress} activeOpacity={0.8} style={styles.packageWrap}>
+      <Surface
+        style={[styles.packageCard, selected && styles.packageCardSelected]}
+        elevation={selected ? 3 : 1}
+      >
+        {/* {selected && (
+          <View style={styles.checkMark}>
+            <MaterialCommunityIcons name="check-circle" size={ms(22)} color={colors.accent} />
+          </View>
+        )} */}
+        {(pkg.highlight || pkg.badgeText) && (
+          <LinearGradient
+            colors={gradients.premium}
+            style={styles.popularBadge}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+          >
+            <Text style={styles.popularText}>
+              {pkg.badgeText ? `⭐ ${pkg.badgeText}` : '⭐ MOST POPULAR'}
+            </Text>
+          </LinearGradient>
+        )}
+        <View style={styles.packageBody}>
+          <View style={styles.packageLeft}>
+            <Text style={styles.packageCredits}>
+              {total} credits{pkg.bonusCredits ? ` (+${pkg.bonusCredits} bonus)` : ''}
+            </Text>
+            <Text style={styles.packageLabel}>
+              {pkg.label} · ~{Math.floor(total / 3)} products unlocked
+            </Text>
+            {pkg.savingsPercent ? (
+              <View style={styles.savingsBadge}>
+                <Text style={styles.savingsText}>{pkg.savingsPercent}% off</Text>
+              </View>
+            ) : null}
+          </View>
+          <View style={styles.packageRight}>
+            <Text style={styles.packagePrice}>{pkg.usdcAmount} USDC</Text>
+            <Text style={styles.packagePer}>
+              {(pkg.usdcAmount / total).toFixed(2)} USDC/credit
+            </Text>
+          </View>
         </View>
-      )}
-      {pkg.highlight && (
-        <LinearGradient
-          colors={gradients.premium}
-          style={styles.popularBadge}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-        >
-          <Text style={styles.popularText}>⭐ MOST POPULAR</Text>
-        </LinearGradient>
-      )}
-      <View style={styles.packageBody}>
-        <View style={styles.packageLeft}>
-          <Text style={styles.packageCredits}>{pkg.credits} credits</Text>
-          <Text style={styles.packageLabel}>
-            {pkg.label} · ~{Math.floor(pkg.credits / 3)} products unlocked
-          </Text>
-        </View>
-        <View style={styles.packageRight}>
-          <Text style={styles.packagePrice}>{pkg.usdcAmount} USDC</Text>
-          <Text style={styles.packagePer}>
-            {(pkg.usdcAmount / pkg.credits).toFixed(2)} USDC/credit
-          </Text>
-        </View>
-      </View>
-    </Surface>
-  </TouchableOpacity>
-);
+      </Surface>
+    </TouchableOpacity>
+  );
+};
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
@@ -287,6 +381,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: s(12), paddingVertical: vs(7),
   },
   historyText: { color: 'rgba(255,255,255,0.5)', fontSize: ms(12), fontWeight: '600' },
+
+  testnetBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: ms(7),
+    backgroundColor: 'rgba(46,125,90,0.2)', borderRadius: radius.pill,
+    paddingHorizontal: s(14), paddingVertical: vs(7), alignSelf: 'flex-start',
+    borderWidth: 1, borderColor: 'rgba(46,125,90,0.4)',
+  },
+  testnetDot: { width: ms(7), height: ms(7), borderRadius: ms(4), backgroundColor: colors.success },
+  testnetText: { color: colors.success, fontSize: ms(11), fontWeight: '700' },
 
   demoBadge: {
     flexDirection: 'row', alignItems: 'center', gap: ms(7),
@@ -316,6 +419,34 @@ const styles = StyleSheet.create({
   },
   sectionSub: { fontSize: ms(12), color: colors.muted, marginBottom: vs(12) },
 
+  tabSwitcher: {
+    flexDirection: 'row',
+    backgroundColor: colors.mutedSoft,
+    borderRadius: radius.xl,
+    padding: ms(4),
+    gap: ms(4),
+  },
+  tab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: s(5),
+    paddingVertical: vs(10),
+    borderRadius: radius.lg,
+  },
+  tabActive: {
+    backgroundColor: colors.heroDark,
+  },
+  tabText: {
+    fontSize: ms(13),
+    fontWeight: '700',
+    color: colors.muted,
+  },
+  tabTextActive: {
+    color: colors.white,
+  },
+
   unlockCard: { borderRadius: radius.xl, backgroundColor: colors.card, overflow: 'hidden' },
   unlockRow: { flexDirection: 'row', alignItems: 'center', gap: ms(12), padding: ms(14) },
   unlockRowBorder: { borderBottomWidth: 1, borderBottomColor: colors.border },
@@ -333,8 +464,17 @@ const styles = StyleSheet.create({
   popularText: { color: colors.white, fontSize: ms(11), fontWeight: '800', letterSpacing: 0.5 },
   packageBody: { flexDirection: 'row', alignItems: 'center', padding: ms(16), gap: spacing.md },
   packageLeft: { flex: 1 },
-  packageCredits: { fontSize: ms(20), fontWeight: '800', color: colors.primary },
+  packageCredits: { fontSize: ms(18), fontWeight: '800', color: colors.primary },
   packageLabel: { fontSize: ms(12), color: colors.muted, marginTop: vs(2) },
+  savingsBadge: {
+    marginTop: vs(4),
+    backgroundColor: colors.successSoft,
+    borderRadius: radius.pill,
+    alignSelf: 'flex-start',
+    paddingHorizontal: s(8),
+    paddingVertical: vs(2),
+  },
+  savingsText: { fontSize: ms(10), fontWeight: '800', color: colors.success },
   packageRight: { alignItems: 'flex-end' },
   packagePrice: { fontSize: ms(20), fontWeight: '800', color: colors.primary },
   packagePer: { fontSize: ms(11), color: colors.muted, marginTop: vs(2) },

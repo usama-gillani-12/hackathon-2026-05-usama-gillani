@@ -4,7 +4,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DrawerNavigator } from './DrawerNavigator';
-import { DemoModeBanner } from '../components/DemoModeBanner';
+import { NetworkModeBanner } from '../components/NetworkModeBanner';
 import { ProductDetailScreen } from '../screens/ProductDetailScreen';
 import { ScoreBreakdownScreen } from '../screens/ScoreBreakdownScreen';
 import { CompareProductsScreen } from '../screens/CompareProductsScreen';
@@ -17,7 +17,7 @@ const DrawerRoot = () => {
   const insets = useSafeAreaInsets();
   return (
     <View style={{ flex: 1, paddingTop: insets.top }}>
-      <DemoModeBanner />
+      <NetworkModeBanner />
       <DrawerNavigator />
     </View>
   );

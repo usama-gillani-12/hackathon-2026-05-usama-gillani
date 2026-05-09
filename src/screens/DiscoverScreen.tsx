@@ -418,6 +418,7 @@ export const DiscoverScreen: React.FC = () => {
         <FlatList
           data={pagedBestSellers}
           keyExtractor={(item) => item.product.id}
+          style={styles.flatList}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
           onEndReached={loadMore}
@@ -522,7 +523,7 @@ export const DiscoverScreen: React.FC = () => {
           ListEmptyComponent={
             !loadingBestSellers && !error ? (
               <View style={styles.emptyWrap}>
-                <AppText style={styles.emptyIllu}>{searchQuery ? '🔍' : '📦'}</AppText>
+                 <AppText style={styles.emptyIllu}>{searchQuery ? '🔍' : '📦'}</AppText> 
                 <AppText variant="title3" color={colors.textPrimary} center style={styles.emptyTitle}>
                   {searchQuery ? `No results for "${searchQuery}"` : 'No products found'}
                 </AppText>
@@ -654,7 +655,8 @@ const styles = StyleSheet.create({
   chipLabelActive: { fontWeight: '700' },
 
   // List
-  list: { paddingHorizontal: spacing.lg, paddingTop: vs(14), paddingBottom: vs(40) },
+  flatList: { flex: 1 },
+  list: { flexGrow: 1, paddingHorizontal: spacing.lg, paddingTop: vs(14), paddingBottom: vs(40) },
   categoryBanner: {
     borderRadius: radius.xl,
     padding: ms(16),
@@ -697,7 +699,9 @@ const styles = StyleSheet.create({
 
   // Empty state
   emptyWrap: {
+    flex: 1,
     alignItems: 'center',
+    justifyContent: 'center',
     paddingVertical: vs(48),
     gap: vs(10),
   },

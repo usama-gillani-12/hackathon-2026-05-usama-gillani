@@ -8,6 +8,8 @@ export const StorageKeys = {
   OnboardingComplete: '@trendscout/onboarding-complete',
   ProductCache: '@trendscout/product-cache',
   Settings: '@trendscout/settings',
+  WalletAddress: '@trendpro/wallet-address',
+  ChainVolume: '@trendpro/chain-volume',
 } as const;
 
 export async function readJson<T>(key: string, fallback: T): Promise<T> {

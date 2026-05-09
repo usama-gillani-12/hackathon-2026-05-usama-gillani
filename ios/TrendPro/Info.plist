@@ -30,6 +30,20 @@
           <string>com.trendpro.app</string>
         </array>
       </dict>
+      <dict>
+        <key>CFBundleURLSchemes</key>
+        <array>
+          <string>wc</string>
+        </array>
+      </dict>
+    </array>
+    <key>LSApplicationQueriesSchemes</key>
+    <array>
+      <string>metamask</string>
+      <string>rainbow</string>
+      <string>trust</string>
+      <string>coinbase</string>
+      <string>wc</string>
     </array>
     <key>CFBundleVersion</key>
     <string>1</string>
@@ -77,6 +91,10 @@
       <string>FontAwesome5_Brands.ttf</string>
       <string>FontAwesome5_Regular.ttf</string>
       <string>FontAwesome5_Solid.ttf</string>
+      <string>FontAwesome6_Brands.ttf</string>
+      <string>FontAwesome6_Regular.ttf</string>
+      <string>FontAwesome6_Solid.ttf</string>
+      <string>Fontisto.ttf</string>
       <string>AntDesign.ttf</string>
       <string>Entypo.ttf</string>
       <string>EvilIcons.ttf</string>

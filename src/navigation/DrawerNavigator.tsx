@@ -11,6 +11,7 @@ import { AnalyticsScreen } from '../screens/AnalyticsScreen';
 import { NotificationsScreen } from '../screens/NotificationsScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
 import { TransactionHistoryScreen } from '../screens/TransactionHistoryScreen';
+import { InvestorMetricsScreen } from '../screens/InvestorMetricsScreen';
 
 const Drawer = createDrawerNavigator<DrawerParamList>();
 
@@ -54,6 +55,7 @@ export const DrawerNavigator: React.FC = () => {
       <Drawer.Screen name="Notifications" component={NotificationsScreen} />
       <Drawer.Screen name="Settings" component={SettingsScreen} />
       <Drawer.Screen name="TransactionHistory" component={TransactionHistoryScreen} />
+      <Drawer.Screen name="InvestorMetrics" component={InvestorMetricsScreen} />
     </Drawer.Navigator>
   );
 };

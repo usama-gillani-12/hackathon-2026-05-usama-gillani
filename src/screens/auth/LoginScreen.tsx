@@ -72,8 +72,8 @@ interface FloatingInputProps {
   clearOnChange?: () => void;
 }
 
-const FLOAT_TRANSLATE_Y = -vs(22);
-const FLOAT_FONT_DEFAULT = ms(15);
+const FLOAT_TRANSLATE_Y = -vs(16);
+const FLOAT_FONT_DEFAULT = ms(14);
 const FLOAT_FONT_FLOATED = ms(11);
 
 const FloatingInput: React.FC<FloatingInputProps> = ({
@@ -140,28 +140,28 @@ const FloatingInput: React.FC<FloatingInputProps> = ({
 
 const floatStyles = StyleSheet.create({
   wrap: {
-    height: vs(60),
+    height: vs(50),
     borderRadius: radius.lg,
     borderWidth: 1,
     backgroundColor: 'rgba(255,255,255,0.07)',
-    paddingHorizontal: s(16),
+    paddingHorizontal: s(14),
     justifyContent: 'center',
     position: 'relative',
   },
   label: {
     position: 'absolute',
-    left: s(16),
+    left: s(14),
     top: '50%',
-    marginTop: -ms(8),
+    marginTop: -ms(7),
     fontWeight: '500',
     pointerEvents: 'none',
   } as any,
   input: {
     color: colors.white,
-    fontSize: ms(15),
-    paddingTop: vs(12),
+    fontSize: ms(14),
+    paddingTop: vs(10),
     paddingBottom: 0,
-    paddingRight: s(40),
+    paddingRight: s(36),
   },
   rightSlot: {
     position: 'absolute',
@@ -228,7 +228,7 @@ const ctaStyles = StyleSheet.create({
   outer: {
     borderRadius: radius.pill,
     overflow: 'hidden',
-    height: vs(56),
+    height: vs(50),
     ...shadow.md,
     shadowColor: colors.premium,
   },
@@ -540,7 +540,7 @@ const styles = StyleSheet.create({
   socialSection: { gap: vs(10), marginBottom: vs(20) },
   appleBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: s(10),
-    height: vs(54), borderRadius: radius.pill,
+    height: vs(48), borderRadius: radius.pill,
     backgroundColor: '#000000',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)',
     ...shadow.sm,
@@ -548,7 +548,7 @@ const styles = StyleSheet.create({
   appleBtnText: { fontWeight: '600' },
   googleBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: s(10),
-    height: vs(54), borderRadius: radius.pill,
+    height: vs(48), borderRadius: radius.pill,
     backgroundColor: '#FFFFFF',
     ...shadow.sm,
   },

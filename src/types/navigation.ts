@@ -21,6 +21,7 @@ export type DrawerParamList = {
   Notifications: undefined;
   Settings: undefined;
   TransactionHistory: undefined;
+  InvestorMetrics: undefined;
 };
 
 export type RootStackParamList = {

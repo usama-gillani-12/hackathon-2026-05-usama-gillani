@@ -12,6 +12,7 @@ import { useSettingsStore } from '../stores/useSettingsStore';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useCreditStore } from '../stores/useCreditStore';
 import { useWatchlistStore } from '../stores/useWatchlistStore';
+import { useWalletStore } from '../stores/useWalletStore';
 
 const Root = createNativeStackNavigator<
   Pick<RootStackParamList, 'Onboarding'> & { Auth: undefined; MainApp: undefined }
@@ -40,11 +41,13 @@ export const AppNavigator: React.FC = () => {
 
   const initCredits = useCreditStore((s) => s.initialize);
   const initWatchlist = useWatchlistStore((s) => s.initialize);
+  const initWallet = useWalletStore((s) => s.initialize);
 
   useEffect(() => {
     initAuth();
     initCredits();
     initWatchlist();
+    initWallet();
   }, []);
 
   if (!hydrated || !authInitialized) {

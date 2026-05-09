@@ -23,6 +23,17 @@ export const PAGE_SIZE_DISCOVER = 12;
 export const MOCK_PAYMENT_LATENCY_MS = 1400;
 export const AD_COPY_COST = 1; // credits to generate AI ad scripts
 
+// ─── Base Sepolia testnet ─────────────────────────────────────────────────────
+export const BASE_SEPOLIA_CHAIN_ID = 84532;
+export const BASE_SEPOLIA_RPC = 'https://base-sepolia-rpc.publicnode.com';
+// USDC contract on Base Sepolia (Circle's official testnet deployment)
+export const BASE_SEPOLIA_USDC_CONTRACT = '0x036CbD53842c5426634e7929541eC2318f3dCF7e' as const;
+// Treasury address — replace with your actual receiving wallet on Base Sepolia
+export const BASE_SEPOLIA_TREASURY = '0x10Bc9282030dd5a2CF4c7D0fc88e3ad2Ef894C24' as `0x${string}`;
+export const USDC_DECIMALS = 6;
+export const TX_POLL_INTERVAL_MS = 3000;
+export const TX_POLL_MAX_ATTEMPTS = 20;
+
 // ─── Cache ────────────────────────────────────────────────────────────────────
 export const PRODUCT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 min
 

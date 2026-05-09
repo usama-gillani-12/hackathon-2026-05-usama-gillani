@@ -83,7 +83,7 @@ const SCORE_DIMS = [
 
 // ── Mini sparkline chart (smooth gradient line + glow dot) ─────────────────────
 const Sparkline: React.FC<{ bars: number[]; color: string }> = ({ bars, color }) => (
-  <SparklineSvg values={bars} color={color} width={ms(80)} height={ms(22)} />
+  <SparklineSvg values={bars} color={color} width={ms(84)} height={ms(14)} />
 );
 
 // ── Animated pulse card wrapper — springs to scale 1.04 + full opacity when

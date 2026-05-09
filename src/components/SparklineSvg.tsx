@@ -44,16 +44,16 @@ export const SparklineSvg: React.FC<Props> = ({ values, color, width = 80, heigh
         <Path
           d={path}
           stroke={`url(#${gradientId})`}
-          strokeWidth={ms(1.8)}
+          strokeWidth={ms(1.4)}
           fill="none"
           strokeLinecap="round"
           strokeLinejoin="round"
         />
 
         {/* Glow halo around the latest point */}
-        <Circle cx={lastX - ms(1.5)} cy={lastY} r={ms(4)} fill={color} opacity={0.25} />
+        <Circle cx={lastX - ms(1)} cy={lastY} r={ms(2.8)} fill={color} opacity={0.2} />
         {/* Solid dot */}
-        <Circle cx={lastX - ms(1.5)} cy={lastY} r={ms(2)} fill={color} />
+        <Circle cx={lastX - ms(1)} cy={lastY} r={ms(1.4)} fill={color} />
       </Svg>
     </View>
   );

@@ -1,207 +1,305 @@
-# TrendScout AI
+# TrendPro
 
-> **A mobile product-research copilot for ecommerce merchants.** Find, score, compare, and unlock trending products before spending money on inventory or ads — with a transparent USDC credit system for premium intelligence.
+> **AI-powered product intelligence for ecommerce merchants — with on-chain USDC payments on Base Sepolia.**
 
-Built as a polished React Native CLI + TypeScript MVP for hackathon judging. Works offline against bundled mock data, but blends in live free APIs (DummyJSON, Fake Store, optional YouTube Data API) when the device is online.
+Discover, score, compare, and unlock high-margin trending products before spending money on inventory or ads. TrendPro blends live Amazon data with a 7-dimension AI scoring engine and a real Web3 credit economy — USDC payments settle on **Base Sepolia testnet** via WalletConnect, with a full mock mode for simulator testing.
 
----
-
-## 1. Project overview
-
-TrendScout AI is built for Shopify, TikTok Shop, dropshippers, Instagram sellers, and small online store owners. It ingests product catalogs and demand signals, runs a weighted **Winning Score** (0–100, 1–10), and surfaces what to test next.
-
-The 9/10 and 10/10 winners are gated behind a **USDC credit unlock**. The credit system is intentionally blockchain-style:
-
-- Buy credits with USDC.
-- Each premium unlock deducts credits.
-- Every payment and unlock is logged with a transaction hash, status, and network so judges can see the audit trail.
-
-For the MVP, settlement is **simulated** via `MockPaymentService` — clearly labeled in the UI as **USDC credit demo mode**. The architecture is testnet-ready: swapping in a real backend-verified payment service is a one-file change.
+Built as a polished **React Native CLI + TypeScript** app. Works offline against bundled mock data, blends in live APIs when online, and ships two payment tiers: simulator-friendly mock mode and real on-chain USDC via MetaMask / Rainbow / any WalletConnect v2 wallet.
 
 ---
 
-## 2. Features
+## Features
 
-- **Onboarding** — three-slide value prop (Discover · Compare · Unlock).
-- **Dashboard** — credit balance, KPIs, top opportunity, quick actions.
-- **Trending Products** — filter by category, recommendation, premium-only; sort by score / margin / social buzz.
-- **Product Detail** — image carousel, full pricing & profit grid, score bars, AI summary, “why trending”, risks, audience, ad angle, suggested platforms.
-- **Premium Lock UX** — blurred name and locked sections with clear unlock cost and current balance.
-- **Score Breakdown** — full transparent dimension explanations.
-- **Compare Products** — pick up to 3, side-by-side table, AI conclusion picks a winner.
-- **Watchlist** — Watching / Testing / Avoided statuses, persisted via AsyncStorage.
-- **Buy Credits** — three USDC packages (5 / 15 / 50), live-style payment flow.
-- **Payment Success** — receipt with hash, network, and status.
-- **Transaction History** — every USDC purchase and credit unlock.
-- **Product Test Plan** — AI-generated audience, angle, ad copy, budget, duration, success metric.
-- **Settings** — toggle Mock API mode, reset credits, clear data, see API status.
+### Product Intelligence
+- **7-Dimension AI Scoring** — Demand, Social Buzz, Profit Potential, Rating, Shipping Ease, Competition, Risk — weighted and combined into a 0–100 Winning Score (1–10 rating)
+- **Live Amazon Data** — Real-Time Amazon Data API via RapidAPI (best sellers, deals, categories)
+- **Dashboard** — Credit balance card, animated metric counters, Market Pulse carousel, What's Trending feed (Reddit), Top Opportunity card, Quick Actions
+- **Trending Products** — Filter by category, recommendation, premium-only; sort by score / margin / social buzz
+- **Discover** — Browse Amazon best sellers by category with live search, recent searches, trending chips
+- **Product Detail** — Image carousel, full pricing & profit grid, animated score bars, AI summary, "why trending", risks, audience, ad angles, suggested platforms
+- **Score Breakdown** — Full transparent per-dimension explanations with weights
+- **Compare Products** — Pick up to 3 products, side-by-side table, AI conclusion picks a winner
+- **AI Ad Copy Generator** — TikTok, Meta, Google ad scripts generated via Gemini 2.0 Flash (1 credit)
+- **Product Test Plan** — AI-generated audience, angle, ad copy, budget, duration, success metric
+
+### Premium Lock System
+- 9/10 products → **3 credits** to unlock
+- 10/10 products → **5 credits** to unlock
+- Blurred name and locked sections with balance check; routes to Buy Credits if insufficient
+
+### Web3 Credit Economy
+
+| Mode | Badge | How it works |
+|------|-------|-------------|
+| **Mock (Demo)** | 🟡 USDC DEMO MODE | Simulates ~1.4s latency, fake `0x…` hash, no wallet needed — works on simulator |
+| **Base Sepolia Testnet** | 🟢 BASE SEPOLIA TESTNET | Real ERC-20 USDC transfer via WalletConnect v2, on-chain receipt polling, verified tx hash |
+
+**Toggle in `App.tsx` — one line:**
+```ts
+const USE_MOCK_PAYMENT = true;   // false → real Base Sepolia USDC
+```
+
+**Credit packages:**
+
+| Package | Credits | Bonus | Total | USDC |
+|---------|---------|-------|-------|------|
+| Starter | 5 | — | 5 | 4 |
+| Pro ⭐ | 12 | +3 | 15 | 9 |
+| Elite | 25 | +10 | 35 | 15 |
+| Power | 60 | +30 | 90 | 28 |
+| Monthly Pass | 25/mo | — | 25 | 19 |
+
+### Other Screens
+- **Watchlist** — Watching / Testing / Avoided statuses, persisted via AsyncStorage
+- **Payment Success** — Receipt with real/mock tx hash, network, timestamp
+- **Transaction History** — Every USDC purchase and credit unlock with full audit trail
+- **Investor Metrics** — Chain volume, total transactions, on-chain stats
+- **Onboarding** — Three-slide value prop (Discover · Compare · Unlock)
+- **Settings** — Mock API toggle, reset credits, clear data, API status
 
 ---
 
-## 3. Free APIs used
+## Tech Stack
 
-| API | Purpose | Required? |
-| --- | --- | --- |
-| [DummyJSON `/products`](https://dummyjson.com/products) | Primary product catalog | No (falls back) |
-| [Fake Store API `/products`](https://fakestoreapi.com/products) | Backup catalog if DummyJSON fails | No (falls back) |
-| YouTube Data API v3 (`/search`) | Social buzz signal | **Optional** |
-
-If DummyJSON and Fake Store both fail, the app uses the bundled `mockProducts` so the demo never breaks. If `EXPO_PUBLIC_YOUTUBE_API_KEY` is missing or invalid, the social-buzz score is computed deterministically from `mockSocialBuzz.ts`.
-
-The hand-tuned demo catalog always includes:
-
-- Pet Travel Water Bottle (10/10 · premium)
-- Mini Thermal Printer (10/10 · premium)
-- LED Face Mask (9/10 · premium)
-- Smart LED Strip (9/10 · premium)
-- Baby Nail Trimmer (9/10 · premium)
-- Portable Neck Fan, Portable Blender, Car Vacuum Cleaner, Foldable Storage Box, Resistance Band Set
+| Layer | Technology |
+|-------|-----------|
+| Framework | React Native 0.74 (bare CLI, not Expo managed) |
+| Language | TypeScript 5 (strict) |
+| Navigation | React Navigation 6 (Stack + Bottom Tab + Drawer) |
+| State | Zustand + AsyncStorage persist |
+| Data fetching | React Query v5 |
+| Animations | Reanimated 3 + React Native Gesture Handler |
+| Web3 | wagmi v3 + viem v2 + WalletConnect v2 (Web3Modal) |
+| Chain | Base Sepolia testnet (Chain ID: 84532) |
+| USDC Contract | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` (Circle official) |
+| AI | Gemini 2.0 Flash (ad copy + insights) |
+| UI | React Native Paper + Linear Gradient + BlurView |
+| Icons | React Native Vector Icons (MaterialCommunityIcons) |
 
 ---
 
-## 4. Setup
+## Setup
 
 ```bash
-# 1. install dependencies
+# 1. Install JS dependencies
 yarn install
 
-# 2. start Metro bundler (resets cache)
-yarn start
+# 2. Install iOS native pods (required)
+cd ios && LANG=en_US.UTF-8 pod install && cd ..
 
-# 3. run on simulator (in a second terminal)
-yarn ios       # iOS simulator
-yarn android   # Android emulator
+# 3. Start Metro bundler
+yarn start --reset-cache
 
-# iOS native dependencies (after adding/removing packages)
-yarn pod-install
+# 4. Run on simulator (separate terminal)
+yarn ios
 ```
 
-> **Tip:** the app caches scored products in memory after the first load. Pull-to-refresh on Dashboard or toggle Mock API mode in Settings to force a re-score.
+> **Note:** This is a **bare React Native CLI** project. Use `yarn ios` / `yarn android`, not `expo start`.
+
+> **iOS minimum deployment target:** 14.0 (required by `@react-native-community/netinfo` v12)
 
 ---
 
-## 5. Optional environment configuration
+## Environment Variables
 
-Create a `.env` file (or export in your shell) before running `yarn start`:
+Create a `.env` file in the project root:
 
 ```bash
-EXPO_PUBLIC_YOUTUBE_API_KEY=your_youtube_data_api_v3_key
+# ── WalletConnect (required for real testnet payments)
+EXPO_PUBLIC_WALLETCONNECT_PROJECT_ID="your_project_id"
+# Get free at: https://cloud.walletconnect.com
+
+# ── Supabase (required for auth)
+EXPO_PUBLIC_SUPABASE_URL="https://your-project.supabase.co"
+EXPO_PUBLIC_SUPABASE_ANON_KEY="your_anon_key"
+
+# ── Amazon live data (optional — falls back to mock)
+EXPO_PUBLIC_RAPIDAPI_KEY="your_rapidapi_key"
+# Subscribe free at: https://rapidapi.com → Real-Time Amazon Data
+
+# ── YouTube social buzz scoring (optional — falls back to mock)
+EXPO_PUBLIC_YOUTUBE_API_KEY="your_youtube_key"
+
+# ── Gemini AI (optional — falls back to static summaries)
+EXPO_PUBLIC_GEMINI_API_KEY="your_gemini_key"
+
+# ── Payment mode
+# true  = mock/demo (no wallet, works on simulator)
+# false = real Base Sepolia USDC (needs MetaMask + testnet USDC)
+EXPO_PUBLIC_USE_MOCK_PAYMENT=true
 ```
 
-`EXPO_PUBLIC_*` keys are inlined into the bundle at build time by `babel-plugin-transform-inline-environment-variables`. **Do not** put server secrets here. The YouTube key is read at bundle time; if it is missing, the app degrades gracefully to mock buzz scores.
+After editing `.env`, always restart Metro with `yarn start --reset-cache`.
 
 ---
 
-## 6. How Mock API mode works
+## Payment Modes
 
-`Settings → Mock API mode` flips the data source.
+### Mock Mode (Simulator / Demo)
 
-- **Off (default):** the app tries DummyJSON, then Fake Store, and finally falls back to bundled mock data — and **always** blends in the curated demo products on top of live ones so judges see the premium examples.
-- **On:** the app skips all network calls and uses only `src/mocks/mockProducts.ts`. Useful for offline demos and CI.
+Set `USE_MOCK_PAYMENT = true` in `App.tsx`. No wallet required.
 
-Implementation lives in [`src/services/productService.ts`](src/services/productService.ts) — `loadScoredProducts({ forceMock: true, refresh: true })`.
+1. Open **Credits** tab
+2. Confirm amber **"USDC DEMO MODE"** badge
+3. Select a package → tap **Pay X USDC**
+4. ~1.4s processing → **PaymentSuccess** screen with fake `0x…` hash
+5. Credits added instantly, transaction logged in history
+
+### Real Base Sepolia Testnet (Physical Device)
+
+Set `USE_MOCK_PAYMENT = false` in `App.tsx`.
+
+**Prerequisites:**
+- iPhone with MetaMask (or Rainbow / any WalletConnect v2 wallet) installed
+- Switch wallet to **Base Sepolia** network
+- Get free testnet USDC from [Base Sepolia faucet](https://faucet.circle.com)
+- Valid `EXPO_PUBLIC_WALLETCONNECT_PROJECT_ID` in `.env`
+
+**Steps:**
+```bash
+# App.tsx: const USE_MOCK_PAYMENT = false;
+yarn start --reset-cache
+yarn ios --device
+```
+
+1. Credits tab → green **"BASE SEPOLIA TESTNET"** badge
+2. Tap **Connect Wallet** → scan QR / deep-link to MetaMask
+3. Select package → tap pay → sign in MetaMask
+4. Wait ~9s for on-chain confirmation
+5. Verify on [Base Sepolia Explorer](https://sepolia.basescan.org)
 
 ---
 
-## 7. How the USDC credit demo works
+## Data Sources
+
+| Source | Purpose | Key Required |
+|--------|---------|-------------|
+| Amazon (RapidAPI) | Live best sellers, categories, deals | `EXPO_PUBLIC_RAPIDAPI_KEY` |
+| DummyJSON | Fallback product catalog | No |
+| Fake Store API | Fallback product catalog | No |
+| Bundled mock | Always blended in — hero demo products always appear | No |
+| YouTube Data API | Social buzz scoring signal | `EXPO_PUBLIC_YOUTUBE_API_KEY` |
+| Reddit API | Market pulse + trending posts | No |
+| Gemini 2.0 Flash | Ad copy generation + AI insights | `EXPO_PUBLIC_GEMINI_API_KEY` |
+
+The app never fully breaks — mock data is always blended in so premium demo products always appear regardless of API availability.
+
+---
+
+## Architecture
+
+### Data Flow
+```
+APIs (Amazon / DummyJSON / FakeStore / YouTube)
+  └─▶ productService.ts       — orchestrates sources, dedupes, memory cache
+        └─▶ scoringService.ts — buildScore() → ScoredProduct (pure function)
+              └─▶ useProductStore (Zustand) — holds ScoredProduct[]
+                    └─▶ useProductsQuery (React Query) — wraps for screens
+```
+
+### Payment Flow (Testnet)
+```
+BuyCreditsScreen.onPay()
+  └─▶ service.createUsdcPaymentIntent(pkg)   — generates intentId
+  └─▶ service.verifyUsdcPayment(intentId)
+        └─▶ WalletConnect → MetaMask         — user signs ERC-20 transfer
+        └─▶ wagmi writeContract()            — USDC → Treasury
+        └─▶ poll getTransactionReceipt()     — every 3s, max 60s
+  └─▶ service.addCredits(pkg, result)
+        └─▶ AsyncStorage balance update
+        └─▶ Transaction history log
+        └─▶ Chain volume increment (Investor Metrics)
+  └─▶ navigate('PaymentSuccess')
+```
+
+### Navigation
+```
+AppNavigator (Stack)
+  ├── Onboarding
+  └── MainApp → RootStackNavigator
+        ├── DrawerRoot → DrawerNavigator
+        │     ├── BottomTabNavigator (Dashboard · Trending · Discover · Watchlist · Credits)
+        │     └── Analytics · Profile · Settings · Notifications
+        ├── ProductDetail
+        ├── ScoreBreakdown
+        ├── CompareProducts
+        ├── ProductTestPlan
+        ├── InvestorMetrics
+        └── PaymentSuccess (modal)
+```
+
+### Scoring Engine Weights
+
+| Dimension | Weight |
+|-----------|--------|
+| Demand | 25% |
+| Social Buzz | 20% |
+| Profit Potential | 20% |
+| Product Rating | 15% |
+| Shipping Ease | 10% |
+| Competition (inverted) | 5% |
+| Risk (inverted) | 5% |
+
+`rating10 ≥ 9` → product is `isPremium`. Unlock costs: 9/10 = 3 credits, 10/10 = 5 credits.
+
+---
+
+## Folder Structure
 
 ```
-┌────────────┐    createUsdcPaymentIntent    ┌────────────────┐
-│  Buy       │ ─────────────────────────▶   │ MockPayment    │
-│  Credits   │                               │ Service        │
-│  Screen    │ ◀─── verifyUsdcPayment ─────  │ (mock TX hash) │
-│            │ ─── addCredits(pkg, result)──▶│                │
-└────────────┘                               └────────────────┘
-        │
-        ▼
-   AsyncStorage   →  balance, transactions, unlocks
-```
-
-- `PaymentService` is an interface in [`src/services/paymentService.ts`](src/services/paymentService.ts).
-- `MockPaymentService` simulates network latency (~1.4s), generates a 0x… 64-char hex hash, marks the transaction `confirmed` on a `mock` network, and credits the local balance via `creditService.addCredits`.
-- Every transaction (purchase or unlock) is persisted to `AsyncStorage` and rendered on the **Transaction History** screen.
-- The UI surfaces a **"USDC credit demo mode"** chip everywhere mock mode is active so demo viewers cannot mistake it for real settlement.
-
-### Premium unlock flow
-
-1. User taps a 9/10 or 10/10 product → premium lock card shows unlock cost + current balance.
-2. If balance ≥ cost → `unlockService.unlockProduct` deducts credits, stores an unlock record, generates a transaction hash, and reveals all locked sections.
-3. If balance < cost → user is routed to **Buy Credits**.
-
-Costs:
-
-- 9/10 product → **3 credits**
-- 10/10 product → **5 credits**
-
----
-
-## 8. Replacing MockPaymentService with a real backend
-
-Real USDC settlement **must** be verified server-side; the mobile client must never hold private keys, seed phrases, or sign transfers.
-
-To go live:
-
-1. Implement `PaymentService` in a new file (e.g. `liveUsdcPaymentService.ts`):
-   ```ts
-   class LiveUsdcPaymentService implements PaymentService {
-     readonly mode = 'mainnet';
-     async createUsdcPaymentIntent(pkg) {
-       return fetch('https://your-api/payments/intent', {
-         method: 'POST',
-         body: JSON.stringify({ packageId: pkg.id }),
-       }).then(r => r.json());
-     }
-     async verifyUsdcPayment(intentId) {
-       return fetch(`https://your-api/payments/${intentId}/verify`).then(r => r.json());
-     }
-     async addCredits(pkg, result) {
-       return fetch('https://your-api/credits/grant', {
-         method: 'POST',
-         body: JSON.stringify({ packageId: pkg.id, txHash: result.txHash }),
-       }).then(r => r.json());
-     }
-   }
-   ```
-2. Register it at app start:
-   ```ts
-   import { setPaymentService } from './src/services/paymentService';
-   setPaymentService(new LiveUsdcPaymentService());
-   ```
-3. Your backend should:
-   - Generate a unique receiving address (or reference) per intent.
-   - Watch the chain (Base / Polygon / Solana USDC, etc.) for a transfer matching the intent.
-   - Only return `confirmed` after sufficient block confirmations.
-   - Be the only place that grants credits — never trust the mobile client to mint them.
-
-The rest of the app works unchanged: balance display, transaction history, premium unlock, demo-mode banner all read from the registered `PaymentService.mode`.
-
----
-
-## 9. Notes & guardrails
-
-- Payments are mocked for the MVP and clearly labeled as demo mode.
-- No private keys, seed phrases, or signing primitives are stored on the device.
-- Production USDC payments must be verified server-side before crediting balances.
-- All persistent state lives in AsyncStorage under namespaced keys (`@trendscout/*`) and can be wiped from Settings.
-
----
-
-## 10. Folder layout
-
-```
+plans/              Feature implementation plans (.md per feature)
 src/
-  api/         DummyJSON, Fake Store, YouTube clients
-  components/  Reusable UI (ProductCard, ScoreBadge, ScoreBar, …)
-  mocks/       Bundled mock products & social-buzz fallbacks
-  navigation/  React Navigation stack
-  screens/     12 screens listed in §2
-  services/    Domain services (scoring, products, payments, unlocks, watchlist, storage)
-  theme/       Colors, spacing, typography tokens
-  types/       Product, credits, navigation TypeScript interfaces
-  utils/       Formatters, hash generator, normalizers, margin math
-App.tsx        Entry point
-app.json       Expo config
-package.json   React Native 0.74, TypeScript 5
+  api/              Raw fetch functions (Amazon, DummyJSON, FakeStore, YouTube, Reddit)
+  components/       Shared UI components + skeletons
+  config/           wagmi + Web3Modal config
+  constants/        App-wide constants (chain IDs, RPC, USDC contract, score weights)
+  hooks/            Custom hooks + React Query hooks
+  lib/              Supabase client singleton
+  mocks/            Bundled mock data (products, social buzz)
+  navigation/       Navigator definitions
+  screens/          One file per screen (auth screens under screens/auth/)
+  services/         Business logic (product, scoring, payment, credit, wallet, unlock, gemini)
+  stores/           Zustand stores (one per domain)
+  theme/            Design tokens (colors, spacing, typography, responsive)
+  types/            Global TypeScript interfaces
+  utils/            Pure utility functions
+App.tsx             App root — payment mode toggle lives here
+index.js            Entry point — polyfills (WalletConnect, ethers, URL)
 ```
 
-Built for a hackathon. Ready to grow into a real product.
+---
+
+## Smart Contracts & Addresses
+
+| Item | Value |
+|------|-------|
+| Network | Base Sepolia (Chain ID: 84532) |
+| RPC | `https://base-sepolia-rpc.publicnode.com` |
+| USDC Contract | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` |
+| Treasury Wallet | `0x10Bc9282030dd5a2CF4c7D0fc88e3ad2Ef894C24` |
+
+---
+
+## Production Checklist
+
+- [ ] Replace `MockPaymentService` / `BaseSepoliaPaymentService` with a backend-verified implementation (server must confirm receipt before granting credits — never trust client)
+- [ ] Move treasury to a multisig wallet
+- [ ] Switch from Base Sepolia → Base Mainnet (update chain config in `src/config/wagmi.ts` + constants)
+- [ ] Add server-side Supabase RLS policies for credit balances
+- [ ] Enable push notifications (store is local-only in MVP)
+- [ ] Connect live Gemini API key for real ad copy generation
+
+---
+
+## Contributing
+
+1. Fork → create feature branch
+2. Run `yarn ts:check` — must pass before any PR
+3. Run `yarn lint` — no new ESLint errors
+4. Create a plan file at `plans/<feature-slug>.md` for any change touching ≥ 3 files
+5. No raw hex colors, no raw pixel values — use theme tokens from `src/theme/`
+6. No `console.log` in production paths — wrap in `if (__DEV__)`
+
+---
+
+Built for a hackathon. Architected to grow into a real product.
